@@ -26,5 +26,6 @@ export const subjectRingkas = (s, k, selesai) => ({
 export const subjectPenuh = (s, k, selesai) => ({
   ...subjectRingkas(s, k, selesai),
   huraian: s.huraian ?? null,
-  ...(k.akses ? { video_id: s.video_id } : {}),
+  // video_id dan rujukan hanya untuk yang layak menonton (rujukan = bahan kuliah itu sendiri)
+  ...(k.akses ? { video_id: s.video_id, rujukan: s.rujukan ?? null } : {}),
 });

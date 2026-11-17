@@ -21,7 +21,16 @@ async function konteks(req, env, repo, now) {
   return { pengguna, hari, peranan, golongan: golonganEfektif(pengguna, hari, peranan).golongan };
 }
 
-const courseAwam = (c, guru) => ({ id: c.id, slug: c.slug, tajuk: c.tajuk, huraian: c.huraian ?? null, golongan: c.golongan || 'awam', guru: (c.guru_emel && guru?.get(c.guru_emel)) || null });
+const courseAwam = (c, guru, kategori) => ({ id: c.id, slug: c.slug, tajuk: c.tajuk, huraian: c.huraian ?? null, golongan: c.golongan || 'awam', guru: (c.guru_emel && guru?.get(c.guru_emel)) || null,
+  kategori: (c.kategori_id && kategori?.get(c.kategori_id)) || null });
+// Kategori untuk paparan (F-12): id -> { id, nama, slug }. Jadual belum wujud: peta kosong.
+const petaKategori = async (repo) => { try { return new Map((await repo.senaraiKategori()).map((x) => [x.id, { id: x.id, nama: x.nama, slug: x.slug }])); } catch { return new Map(); } };
+// Profil guru yang dipapar kepada awam (F-14): nama, kelayakan, institusi, bio sahaja. Emel tidak pernah dihantar.
+async function profilGuru(repo, emel) {
+  if (!emel) return null;
+  let g = null; try { g = await repo.guruDariEmel(emel); } catch { /* jadual belum wujud */ }
+  return g ? { nama: g.nama, kelayakan: g.kelayakan ?? null, institusi: g.institusi ?? null, bio: g.bio ?? null } : null;
+}
 // Nama guru untuk paparan. Jadual guru mungkin belum wujud: pulangkan peta kosong.
 const petaGuru = async (repo) => { try { return new Map((await repo.senaraiGuru()).map((g) => [g.emel, g.nama])); } catch { return new Map(); } };
 
@@ -39,11 +48,24 @@ export async function pelajarApi(req, env, url, repo, now) {
   const k = await konteks(req, env, repo, now);
   const logMasuk = !!k.pengguna;
 
+  // Senarai kategori awam (F-12): hanya kategori yang ada siri terbit yang boleh dilihat pengguna ini.
+  if (bahagian[0] === 'kategori' && bahagian.length === 1 && req.method === 'GET') {
+    const bil = new Map();
+    for (const c of await repo.senaraiCourse()) {
+      if (c.bil_subject_terbit > 0 && c.kategori_id && keterlihatan(c.golongan, k.golongan) !== 'sembunyi') bil.set(c.kategori_id, (bil.get(c.kategori_id) ?? 0) + 1);
+    }
+    let semua = []; try { semua = await repo.senaraiKategori(); } catch { /* jadual belum wujud */ }
+    return json(semua.filter((x) => bil.has(x.id)).map((x) => ({ id: x.id, nama: x.nama, slug: x.slug, bil_course: bil.get(x.id) })));
+  }
+
   if (bahagian[0] === 'course' && bahagian.length === 1 && req.method === 'GET') {
     const selesai = logMasuk ? new Map((await repo.kiraanSelesai(k.pengguna.id)).map((r) => [r.course_id, r.bil])) : null;
     const guru = await petaGuru(repo);
-    const senarai = (await repo.senaraiCourse()).filter((c) => c.bil_subject_terbit > 0 && keterlihatan(c.golongan, k.golongan) !== 'sembunyi')
-      .map((c) => ({ ...courseAwam(c, guru), terkunci_golongan: keterlihatan(c.golongan, k.golongan) === 'berkunci', bil_subject: c.bil_subject_terbit, selesai: selesai ? (selesai.get(c.id) ?? 0) : null }));
+    const kategori = await petaKategori(repo);
+    const tapis = (url.searchParams.get('kategori') || '').trim().toLowerCase();
+    const tapisId = tapis ? ([...kategori.values()].find((x) => x.slug === tapis)?.id ?? -1) : null; // slug tidak dikenali = tiada hasil
+    const senarai = (await repo.senaraiCourse()).filter((c) => c.bil_subject_terbit > 0 && keterlihatan(c.golongan, k.golongan) !== 'sembunyi' && (tapisId === null || c.kategori_id === tapisId))
+      .map((c) => ({ ...courseAwam(c, guru, kategori), terkunci_golongan: keterlihatan(c.golongan, k.golongan) === 'berkunci', bil_subject: c.bil_subject_terbit, selesai: selesai ? (selesai.get(c.id) ?? 0) : null }));
     return json(senarai);
   }
 
@@ -55,7 +77,7 @@ export async function pelajarApi(req, env, url, repo, now) {
       subjectRingkas(s, keputusanSubject({ course: c, subject: s, logMasuk, golongan: k.golongan }), selesai.has(s.id)));
     let sijil = null;
     if (logMasuk) { try { const x = await repo.sijilPengguna(k.pengguna.id, c.id); if (x) sijil = { kod: x.kod }; } catch { /* jadual sijil belum wujud */ } }
-    return json({ course: courseAwam(c, await petaGuru(repo)), subject, log_masuk: logMasuk, sijil });
+    return json({ course: courseAwam(c, await petaGuru(repo), await petaKategori(repo)), guru_profil: await profilGuru(repo, c.guru_emel), subject, log_masuk: logMasuk, sijil });
   }
 
   // Dapatkan sijil: semua kuliah terbit dalam course mesti selesai. Nama boleh ditukar sekali sebelum dikeluarkan sahaja.
@@ -111,7 +133,7 @@ export async function pelajarApi(req, env, url, repo, now) {
       }
     } catch { /* jadual soalan belum wujud */ }
     return json({
-      subject: subjectPenuh(t.s, keputusan, selesai), course: courseAwam(t.c, await petaGuru(repo)), soalan,
+      subject: subjectPenuh(t.s, keputusan, selesai), course: courseAwam(t.c, await petaGuru(repo), await petaKategori(repo)), soalan,
       bil_nota: nota.length, nota: keputusan.akses && logMasuk ? nota : [],
       kedudukan: i + 1, jumlah: adik.length, sebelum: ringkas(adik[i - 1]), seterusnya: ringkas(adik[i + 1]), log_masuk: logMasuk,
     });

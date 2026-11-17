@@ -62,6 +62,29 @@ export const LANGKAH = [
     `CREATE TABLE IF NOT EXISTS sijil ( id INTEGER PRIMARY KEY AUTOINCREMENT, kod TEXT NOT NULL UNIQUE, pengguna_id INTEGER NOT NULL REFERENCES pengguna(id),
       course_id INTEGER NOT NULL, nama TEXT NOT NULL, tajuk_course TEXT NOT NULL, guru TEXT, dikeluarkan_pada TEXT NOT NULL, UNIQUE (pengguna_id, course_id) )`,
   ],
+  // ---- versi 2: kategori, rujukan, profil guru, laporan ----
+  [
+    `CREATE TABLE IF NOT EXISTS kategori ( id INTEGER PRIMARY KEY AUTOINCREMENT, nama TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
+      urutan INTEGER NOT NULL DEFAULT 0, dicipta_pada TEXT NOT NULL )`,
+    `ALTER TABLE course ADD COLUMN kategori_id INTEGER REFERENCES kategori(id)`,
+    `ALTER TABLE subject ADD COLUMN rujukan TEXT`,
+    `ALTER TABLE guru ADD COLUMN kelayakan TEXT`,
+    `ALTER TABLE guru ADD COLUMN institusi TEXT`,
+    `ALTER TABLE guru ADD COLUMN bio TEXT`,
+    `CREATE TABLE IF NOT EXISTS laporan ( id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL REFERENCES subject(id),
+      soalan_id INTEGER, pengguna_id INTEGER NOT NULL REFERENCES pengguna(id), sebab TEXT NOT NULL, catatan TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'baru', catatan_admin TEXT, dicipta_pada TEXT NOT NULL, dikemas_kini_pada TEXT )`,
+    `CREATE INDEX IF NOT EXISTS laporan_status ON laporan(status, dicipta_pada)`,
+    `CREATE INDEX IF NOT EXISTS laporan_pengguna ON laporan(pengguna_id, dicipta_pada)`,
+    `CREATE INDEX IF NOT EXISTS course_kategori ON course(kategori_id)`,
+    // data seed kategori (cadangan; admin boleh ubah di panel)
+    `INSERT OR IGNORE INTO kategori (nama, slug, urutan, dicipta_pada) VALUES
+      ('Pengenalan & Sumber Ilmu', 'pengenalan', 1, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      ('Sejarah Firqah & Mazhab', 'sejarah-firqah', 2, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      ('Akidah & Aliran Pemikiran', 'akidah-aliran', 3, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      ('Ideologi & Pemikiran Moden', 'ideologi-moden', 4, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      ('Gerakan Islam Semasa', 'gerakan-semasa', 5, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+  ],
 ];
 
 let sedia = false; // sekali bagi setiap isolate Worker

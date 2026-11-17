@@ -1,8 +1,8 @@
 // Repo dalam memori dengan antara muka yang sama seperti repoD1 (src/repo.js).
 export function repoPalsu() {
-  const pengguna = new Map(), sesi = new Map();
+  const pengguna = new Map(), sesi = new Map(), kategoriM = new Map();
   const courses = new Map(), subjects = new Map(), progress = new Map(), notas = new Map(), tetapan = new Map(), artikel = new Map(), gurus = new Map(), semakan = new Map(), soalan = new Map(), kodD = new Map(), kodG = [], kodC = [], adminT = new Map(), sijilM = []; let idC = 1, idS = 1, idN = 1, idA = 1, idK = 1, idQ = 1, idKD = 1;
-  let idSeterusnya = 1;
+  let idSeterusnya = 1, idKat = 1;
   return {
     _pengguna: pengguna, _sesi: sesi, _course: courses, _subject: subjects, _progress: progress,
     async simpanPengguna(p, masa) {
@@ -74,13 +74,13 @@ export function repoPalsu() {
     async ciptaCourse(c, masa) {
       const golongan = c.golongan || 'awam';
       const urutan = c.urutan ?? Math.max(0, ...[...courses.values()].map((x) => x.urutan)) + 1;
-      const baris = { id: idC++, tajuk: c.tajuk, slug: c.slug, huraian: c.huraian ?? null, status: c.status, urutan, guru_emel: c.guru_emel ?? null, catatan_semakan: null, golongan, dicipta_pada: masa, dikemas_kini_pada: masa };
+      const baris = { id: idC++, tajuk: c.tajuk, slug: c.slug, huraian: c.huraian ?? null, status: c.status, urutan, guru_emel: c.guru_emel ?? null, catatan_semakan: null, golongan, kategori_id: c.kategori_id ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
       courses.set(baris.id, baris);
       return baris;
     },
     async kemaskiniCourse(id, nilai, masa) {
       const c = courses.get(id);
-      for (const k of ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan']) if (k in nilai) c[k] = nilai[k];
+      for (const k of ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan', 'kategori_id']) if (k in nilai) c[k] = nilai[k];
       c.dikemas_kini_pada = masa;
       return c;
     },
@@ -93,13 +93,13 @@ export function repoPalsu() {
     async ciptaSubject(courseId, v, masa) {
       const urutan = v.urutan ?? Math.max(0, ...[...subjects.values()].filter((s) => s.course_id === courseId).map((s) => s.urutan)) + 1;
       const baris = { id: idS++, course_id: courseId, tajuk: v.tajuk, huraian: v.huraian ?? null, urutan, pratonton: v.pratonton ?? 0, status: v.status ?? 'draf',
-        video_sumber: 'youtube', video_id: v.video_id ?? null, tempoh_saat: v.tempoh_saat ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
+        video_sumber: 'youtube', video_id: v.video_id ?? null, tempoh_saat: v.tempoh_saat ?? null, rujukan: v.rujukan ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
       subjects.set(baris.id, baris);
       return baris;
     },
     async kemaskiniSubject(id, nilai, masa) {
       const s = subjects.get(id);
-      for (const k of ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan']) if (k in nilai) s[k] = nilai[k];
+      for (const k of ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan', 'rujukan']) if (k in nilai) s[k] = nilai[k];
       s.dikemas_kini_pada = masa;
       return s;
     },
@@ -183,9 +183,24 @@ export function repoPalsu() {
       return [...notas.values()].filter((n) => n.status === 'menunggu').map((n) => { const s = subjects.get(n.subject_id), c = courses.get(s.course_id);
         return { id: n.id, nama: n.nama, saiz: n.saiz, subject_id: s.id, subject_tajuk: s.tajuk, course_id: c.id, course_tajuk: c.tajuk, guru_emel: c.guru_emel ?? null }; });
     },
+    async senaraiKategori() {
+      return [...kategoriM.values()].sort((a, b) => a.urutan - b.urutan || a.id - b.id).map((k) => { const cs = [...courses.values()].filter((c) => c.kategori_id === k.id);
+        return { ...k, bil_course: cs.length, bil_course_terbit: cs.filter((c) => c.status === 'terbit').length }; });
+    },
+    async kategoriDariId(id) { return kategoriM.get(id) ?? null; },
+    async kategoriDariSlug(slug) { return [...kategoriM.values()].find((k) => k.slug === slug) ?? null; },
+    async slugKategoriUnik(asas) { let c = asas, n = 1; while ([...kategoriM.values()].some((k) => k.slug === c)) c = `${asas}-${++n}`; return c; },
+    async ciptaKategori(k, masa) {
+      const urutan = k.urutan ?? Math.max(0, ...[...kategoriM.values()].map((x) => x.urutan)) + 1;
+      const b = { id: idKat++, nama: k.nama, slug: k.slug, urutan, dicipta_pada: masa }; kategoriM.set(b.id, b); return b;
+    },
+    async kemaskiniKategori(id, nilai) { const k = kategoriM.get(id); for (const x of ['nama', 'urutan']) if (x in nilai) k[x] = nilai[x]; return k; },
+    async bilCourseKategori(id) { return [...courses.values()].filter((c) => c.kategori_id === id).length; },
+    async padamKategori(id) { kategoriM.delete(id); },
     async senaraiGuru() { return [...gurus.values()].map((g) => ({ ...g, bil_course: [...courses.values()].filter((c) => c.guru_emel === g.emel).length })).sort((a, b) => a.nama.localeCompare(b.nama)); },
     async guruDariEmel(e) { return gurus.get(e) ?? null; },
-    async simpanGuru(emel, nama, masa) { gurus.set(emel, { emel, nama, dicipta_pada: gurus.get(emel)?.dicipta_pada ?? masa }); },
+    async simpanGuru(emel, nama, masa) { const ada = gurus.get(emel); gurus.set(emel, { kelayakan: null, institusi: null, bio: null, ...ada, emel, nama, dicipta_pada: ada?.dicipta_pada ?? masa }); },
+    async kemaskiniProfilGuru(emel, p) { const g = gurus.get(emel); Object.assign(g, { kelayakan: p.kelayakan ?? null, institusi: p.institusi ?? null, bio: p.bio ?? null }); return g; },
     async padamGuru(emel) { gurus.delete(emel); },
     async subjectMenunggu() {
       return [...subjects.values()].filter((s) => s.status === 'menunggu').map((s) => { const c = courses.get(s.course_id);

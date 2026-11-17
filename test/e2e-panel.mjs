@@ -47,14 +47,14 @@ try {
 
   await langkah('panel dibuka untuk admin daripada ADMIN_EMELS, senarai kosong', async () => {
     await page.goto(B + '/panel/');
-    await page.getByText('Belum ada course').waitFor();
+    await page.getByText('Belum ada siri').waitFor();
     assert.equal(await page.locator('#pengguna .role-chip').getAttribute('title'), ADMIN); // nama dipapar, emel dalam tooltip
     assert.ok((await page.locator('#pengguna').textContent()).includes('Admin E2E'));
     await skrin('01-kosong');
   });
 
   await langkah('course tanpa tajuk ditolak dengan mesej dan medan ditanda', async () => {
-    await page.getByRole('link', { name: 'Tambah course' }).click();
+    await page.getByRole('link', { name: 'Tambah siri' }).click();
     await simpan();
     await page.getByText('Tajuk wajib diisi').waitFor();
     assert.ok(await page.locator('#tajuk').evaluate((e) => e.classList.contains('salah')));
@@ -66,11 +66,11 @@ try {
     await page.check('input[name=status][value=terbit]');
     await simpan();
     await page.locator('h1', { hasText: 'Pengenalan Kuliah Haraki' }).waitFor();
-    await page.getByText('belum ada subject yang diterbitkan').waitFor();
+    await page.getByText('belum ada kuliah yang diterbitkan').waitFor();
   });
 
   await langkah('subject intro: pautan YouTube penuh disimpan, tanpa log masuk', async () => {
-    await page.getByRole('link', { name: 'Tambah subject' }).click();
+    await page.getByRole('link', { name: 'Tambah kuliah' }).click();
     await page.fill('#tajuk', 'Video Intro');
     await page.fill('#video', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5s');
     await page.check('input[name=pratonton]');
@@ -82,7 +82,7 @@ try {
   });
 
   await langkah('pautan bukan YouTube ditolak, kemudian dibetulkan', async () => {
-    await page.getByRole('link', { name: 'Tambah subject' }).click();
+    await page.getByRole('link', { name: 'Tambah kuliah' }).click();
     await page.fill('#tajuk', 'Bab 1: Asas');
     await page.fill('#video', 'https://youtube.com.penipu.test/watch?v=dQw4w9WgXcQ');
     await page.check('input[name=status][value=terbit]');
@@ -95,7 +95,7 @@ try {
   });
 
   await langkah('subject draf tanpa video boleh disimpan; terbit tanpa video ditolak', async () => {
-    await page.getByRole('link', { name: 'Tambah subject' }).click();
+    await page.getByRole('link', { name: 'Tambah kuliah' }).click();
     await page.fill('#tajuk', 'Bab 2: Lanjutan');
     await page.check('input[name=status][value=terbit]');
     await simpan();
@@ -142,25 +142,25 @@ try {
     await page.goBack();
   });
 
-  await langkah('padam course yang masih ada subject ditolak dengan mesej jelas', async () => {
-    await page.getByRole('link', { name: 'Sunting course' }).click();
-    await page.getByRole('button', { name: 'Padam course' }).click();
-    await page.getByText('masih ada subject').waitFor();
+  await langkah('padam course yang masih ada kuliah ditolak dengan mesej jelas', async () => {
+    await page.getByRole('link', { name: 'Sunting siri' }).click();
+    await page.getByRole('button', { name: 'Padam siri' }).click();
+    await page.getByText('masih ada kuliah').waitFor();
   });
 
   await langkah('padam subject draf; senarai course menunjukkan kiraan betul', async () => {
     await page.goBack();
     await page.locator('.subject', { hasText: 'Bab 2: Lanjutan' }).getByRole('link', { name: 'Sunting' }).click();
-    await page.getByRole('button', { name: 'Padam subject' }).click();
+    await page.getByRole('button', { name: 'Padam kuliah' }).click();
     await page.locator('h1', { hasText: 'Pengenalan Kuliah Haraki' }).waitFor();
     assert.deepEqual(await tajukSubject(), ['1. Video Intro', '2. Bab 1: Asas Akidah']);
-    await page.getByRole('link', { name: 'Semua course' }).click();
-    await page.getByText('2 daripada 2 subject diterbitkan').waitFor();
+    await page.getByRole('link', { name: 'Semua siri' }).click();
+    await page.getByText('2 daripada 2 kuliah diterbitkan').waitFor();
     await skrin('03-senarai-course');
   });
 
   await langkah('tajuk berisi HTML dipaparkan sebagai teks (tiada XSS)', async () => {
-    await page.getByRole('link', { name: 'Tambah course' }).click();
+    await page.getByRole('link', { name: 'Tambah siri' }).click();
     await page.fill('#tajuk', '<img src=x onerror=alert(1)>Ujian');
     await simpan();
     await page.locator('h1', { hasText: '<img src=x onerror=alert(1)>Ujian' }).waitFor();
@@ -209,7 +209,7 @@ try {
     await simpan();
     await page.locator('#tetapan-ok').waitFor({ state: 'visible' });
     await page.goto(B + '/panel/#/');
-    await page.locator('h1', { hasText: 'Course' }).waitFor();
+    await page.locator('h1', { hasText: 'Siri' }).waitFor();
   });
 
   await langkah('artikel: cipta draf, pratonton, terbit dengan amaran perkataan, slug dikunci, muncul di laman awam dan sitemap', async () => {
@@ -294,17 +294,17 @@ try {
     g.on('pageerror', (e) => ralatHalaman.push('guru: ' + e.message));
     g.on('dialog', (d) => d.accept());
     await g.goto(B + '/panel/');
-    await g.locator('h1', { hasText: 'Course saya' }).waitFor();
+    await g.locator('h1', { hasText: 'Siri saya' }).waitFor();
     assert.equal(await g.getByRole('link', { name: 'Kelulusan' }).count(), 0);
     assert.equal(await g.getByRole('link', { name: 'Tetapan laman' }).count(), 0);
-    await g.getByRole('link', { name: 'Tambah course' }).click();
+    await g.getByRole('link', { name: 'Tambah siri' }).click();
     assert.equal(await g.locator('input[name=status][value=terbit]').count(), 0); // guru tidak boleh terus terbit
     assert.equal(await g.locator('#guru_emel').count(), 0);
     await g.fill('#tajuk', 'Sirah Guru');
     await g.check('input[name=status][value=menunggu]');
     await g.getByRole('button', { name: 'Simpan' }).click();
     await g.getByText('menunggu kelulusan', { exact: false }).first().waitFor();
-    await g.getByRole('link', { name: 'Tambah subject' }).click();
+    await g.getByRole('link', { name: 'Tambah kuliah' }).click();
     await g.fill('#tajuk', 'Sirah 1');
     await g.fill('#video', 'https://youtu.be/sirahsirah1');
     await g.check('input[name=pratonton]'); // pelawat boleh menonton dan membaca soal jawab kuliah ini
@@ -326,7 +326,7 @@ try {
     await page.locator('.kad', { hasText: 'Sirah Guru' }).first().getByText('Guru: Ustaz Guru').waitFor();
     await skrin('09-kelulusan');
     await page.locator('button[data-act=lulus][data-jenis=course]').click();
-    await page.locator('h2', { hasText: 'Course baru (0)' }).waitFor();
+    await page.locator('h2', { hasText: 'Siri baru (0)' }).waitFor();
     await page.locator('button[data-act=lulus][data-jenis=subject]').click();
     await page.locator('h2', { hasText: 'Kuliah baru (0)' }).waitFor();
     const awam = await pelayar.newContext({ serviceWorkers: 'block' });
@@ -346,7 +346,7 @@ try {
     await g.locator('.kad', { hasText: 'Sirah Guru' }).click();
     await g.locator('.subject', { hasText: 'Sirah 1' }).getByRole('link', { name: 'Sunting' }).click();
     await g.getByText('Sudah diterbitkan. Perubahan').waitFor();
-    assert.equal(await g.getByRole('button', { name: 'Padam subject' }).count(), 0);
+    assert.equal(await g.getByRole('button', { name: 'Padam kuliah' }).count(), 0);
     await g.fill('#tajuk', 'Sirah 1: Kelahiran');
     await g.getByRole('button', { name: 'Simpan' }).click();
     await g.locator('.subject', { hasText: 'Sirah 1' }).getByText('Perubahan menunggu').waitFor();

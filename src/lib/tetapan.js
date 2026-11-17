@@ -21,6 +21,9 @@ export const MEDAN = {
   sijil_penandatangan: { maks: 80, lalai: '' }, // nama di bawah garis tandatangan; kosong = nama guru course
   sijil_jawatan: { maks: 80, lalai: '' },
   hari_sesi: { maks: 3, lalai: '30' },
+  // F-15: penafian dan notis privasi. Boleh disunting admin di Tetapan laman; teks biasa, baris baharu dikekalkan.
+  penafian_teks: { maks: 800, lalai: 'Kuliah di laman ini menerangkan pelbagai fahaman dan aliran sebagai bahan pendidikan dan pengetahuan. Pandangan yang dikemukakan ialah pandangan penyampai masing-masing. Rujuk rujukan yang disenaraikan dan pihak berkuasa agama negeri anda untuk keputusan hukum dan fatwa. Laman ini tidak menghukum individu. Jika anda menjumpai kandungan yang salah atau mengelirukan, sila gunakan butang Lapor.' },
+  privasi_teks: { maks: 500, lalai: 'Kami mengumpul nama dan emel daripada akaun Google anda, serta kemajuan tontonan, soalan dan laporan yang anda hantar. Data ini digunakan untuk log masuk, menyimpan kemajuan, mengeluarkan sijil dan menyelia kandungan. Hanya admin boleh melihat emel anda. Untuk memadam akaun, hubungi admin laman.' },
   warna: { maks: 10, lalai: 'ungu' }, // warna tema lalai (hijau, biru, ungu, marun, arang)
 };
 export const LALAI = Object.fromEntries(Object.entries(MEDAN).map(([k, v]) => [k, v.lalai]));

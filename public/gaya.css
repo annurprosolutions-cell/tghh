@@ -416,3 +416,37 @@ a.course:hover .thumb>div:first-child{transform:scale(1.07)}
 .p-admin .pilih-warna input{accent-color:var(--brand)}
 .p-admin .senarai-sandaran{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .p-admin .senarai-sandaran li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);flex-wrap:wrap}
+
+/* ===== Fasa 2: niche (kategori, rujukan Arab, profil guru, penafian) ===== */
+/* Teks Arab: font sistem sahaja (tiada muat turun); bdi mengasingkan arah supaya baris campuran BM/Arab tidak terbalik. */
+.arab{font-family:"Noto Naskh Arabic","Amiri","Traditional Arabic","Geeza Pro","Scheherazade New","Times New Roman",serif;font-size:1.25em;line-height:1.9}
+.rujukan-blok{margin-top:16px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);max-width:720px}
+.rujukan-blok h2{font-size:1.05rem;margin:0 0 10px}
+.rujukan-blok ol{margin:0;padding-inline-start:1.5em}
+.rujukan-blok li{margin:0 0 8px;font-size:15px;line-height:1.6;overflow-wrap:anywhere;word-break:break-word}
+.rujukan-blok li.ada-arab{line-height:1.9}
+.penafian{display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:12px 14px;background:#FFF8E6;border-inline-start:4px solid #A16207;border-radius:var(--r-sm);color:#3F2A06;font-size:14px;line-height:1.55}
+.penafian svg{flex:none;margin-top:2px;color:#A16207}
+.penafian p{margin:0;overflow-wrap:anywhere}
+.foot-penafian{margin:24px 0 0;padding:14px 0 24px;border-top:1px solid var(--line);color:var(--ink-2);font-size:13px;line-height:1.55}
+.foot-penafian p{margin:0;overflow-wrap:anywhere}
+.foot-penafian-gelap{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);color:#C8D3E6;font-size:13px;line-height:1.6}
+.foot-penafian-gelap b{display:block;color:#fff;margin-bottom:4px}
+.foot-penafian-gelap p{margin:0;overflow-wrap:anywhere}
+.auth-card .nota-privasi,.auth-card .nota-penafian{text-align:start;font-size:12px;line-height:1.5;margin-top:10px;overflow-wrap:anywhere}
+.auth-card .nota-privasi b,.auth-card .nota-penafian b{color:#C8D3E6}
+.penapis-kat{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.cip{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.cip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.cip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.kosong-tapis{grid-column:1/-1}
+.lencana-kat{display:inline-block;margin:0 0 6px;padding:3px 10px;border-radius:999px;background:#FEF3C7;color:#7A4B00;font-size:12px;font-weight:700;letter-spacing:.02em}
+.kad-guru{margin:0 0 16px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.kad-guru-label{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.kad-guru h3{margin:4px 0 2px;font-size:1.1rem}
+.kad-guru p{margin:4px 0 0;overflow-wrap:anywhere;font-size:14px;line-height:1.55}
+.kad-guru-kelayakan{font-weight:600;color:var(--ink)}
+.kad-guru-institusi,.kad-guru-bio{color:var(--ink-2)}
+/* panel */
+.p-admin .lencana.kat{background:#FEF3C7;color:#7A4B00;border-color:transparent}
+.p-admin .rujukan-medan{font-size:16px;line-height:1.7;font-family:inherit}

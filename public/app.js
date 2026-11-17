@@ -14,6 +14,59 @@ const akar = document.getElementById('akar');
 const h = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dua = (n) => String(n).padStart(2, '0');
 
+// ---------- Fasa 2: rujukan Arab, penafian, penapis kategori ----------
+// Semua teks pengguna melalui h(). Baris baharu ditukar kepada <br> hanya selepas escape.
+const ARAB = '\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\uFD3E\uFD3F';
+const LARI_ARAB = new RegExp(`[${ARAB}]+(?:[\\s\\u060C\\u061B\\u061F():.,\\-/0-9]+[${ARAB}]+)*`, 'g');
+const KUAT_PERTAMA = new RegExp(`[A-Za-z\\u00C0-\\u024F${ARAB}]`);
+const LAHIR_ARAB = new RegExp(`[${ARAB}]`);
+const barisBaru = (t) => h(t).replace(/\n/g, '<br>');
+// Satu baris satu rujukan. Larian teks Arab dibungkus <bdi class="arab"> supaya baris campuran BM/Arab tidak terbalik
+// dan tidak mengacau tanda baca sekeliling; baris Arab sepenuhnya mengikut dir="auto" (kanan ke kiri).
+function barisRujukan(b) {
+  let keluar = '', akhir = 0, ada = false;
+  for (const m of b.matchAll(LARI_ARAB)) {
+    ada = true;
+    keluar += h(b.slice(akhir, m.index)) + `<bdi class="arab">${h(m[0])}</bdi>`;
+    akhir = m.index + m[0].length;
+  }
+  keluar += h(b.slice(akhir));
+  // Arah baris = aksara kuat pertama (Arab: kanan ke kiri, selain itu kiri ke kanan). dir="auto" tidak boleh dipakai di sini
+  // kerana ia mengabaikan teks dalam <bdi>, jadi baris yang bermula dengan Arab tersalah dikesan sebagai kiri ke kanan.
+  const kuat = b.match(KUAT_PERTAMA)?.[0];
+  const rtl = !!kuat && LAHIR_ARAB.test(kuat);
+  return `<li dir="${rtl ? 'rtl' : 'ltr'}"${ada ? ' class="ada-arab"' : ''}>${keluar}</li>`;
+}
+function blokRujukan(teks) {
+  const baris = String(teks ?? '').split('\n').map((x) => x.trim().replace(/^(?:\d{1,3}[.)]|[-\u2022*])\s+/, '')).filter(Boolean);
+  if (!baris.length) return '';
+  return `<section class="rujukan-blok" aria-labelledby="rujukan-tajuk"><h2 id="rujukan-tajuk">Rujukan</h2><ol>${baris.map(barisRujukan).join('')}</ol></section>`;
+}
+const IKON_INFO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+function blokPenafian() {
+  const t = String(konfig.laman.penafian_teks ?? '').trim();
+  return t ? `<aside class="penafian" role="note">${IKON_INFO}<p>${barisBaru(t)}</p></aside>` : '';
+}
+const ayatPertama = (t) => String(t ?? '').trim().split(/(?<=[.!?])\s/)[0];
+function footerPenafian() {
+  const t = String(konfig.laman.penafian_teks ?? '').trim();
+  return t ? `<footer class="foot-penafian"><p>${barisBaru(t)}</p></footer>` : '';
+}
+// Penapis kategori: senarai disimpan dalam TAPIS supaya klik cip memaparkan semula tanpa permintaan baharu.
+const TAPIS = {};
+const bekasTapis = (id, senarai, papar, atribut = '') => { TAPIS[id] = { senarai, papar }; return `<div id="${id}" ${atribut} data-tapis-bekas>${senarai.map(papar).join('')}</div>`; };
+const cipKategori = (id, kategori) => (kategori.length ? `<div class="penapis-kat" role="group" aria-label="Tapis ikut kategori" data-tapis-untuk="${id}">
+  <button type="button" class="cip" aria-pressed="true" data-act="tapis-kat" data-tapis="${id}" data-kat="">Semua</button>
+  ${kategori.map((k) => `<button type="button" class="cip" aria-pressed="false" data-act="tapis-kat" data-tapis="${id}" data-kat="${h(k.slug)}">${h(k.nama)}</button>`).join('')}</div>` : '');
+function paparTapis(id, kat) {
+  const t = TAPIS[id], bekas = document.getElementById(id);
+  if (!t || !bekas) return;
+  const ada = t.senarai.filter((c) => !kat || c.kategori?.slug === kat);
+  bekas.innerHTML = ada.length ? ada.map(t.papar).join('') : '<div class="panel-card ralat-halaman kosong-tapis"><p>Belum ada siri dalam kategori ini.</p></div>';
+  document.querySelectorAll(`[data-tapis-untuk="${id}"] .cip`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kat === (kat || ''))));
+  window.KH_efek?.pasang(bekas);
+}
+
 // `laman` datang dari tetapan admin (/api/konfig); nilai di sini hanya sandaran jika permintaan gagal.
 let konfig = { googleClientId: '', laman: {
   nama: 'Haraki Hub', tagline: 'Belajar bila-bila masa', hero_tajuk: 'Belajar tanpa terikat masa dan tempat.',
@@ -140,7 +193,7 @@ function topbar(aktif) {
   </div>`;
 }
 
-const halamanApp = (aktif, isi) => `<div class="app${saya ? ' ada-tab' : ''}"><div class="app-wrap">${topbar(aktif)}<div class="page">${isi}</div></div>${saya ? barBawah(aktif) : ''}</div>`;
+const halamanApp = (aktif, isi) => `<div class="app${saya ? ' ada-tab' : ''}"><div class="app-wrap">${topbar(aktif)}<div class="page">${isi}</div>${footerPenafian()}</div>${saya ? barBawah(aktif) : ''}</div>`;
 
 // Kad ajakan log masuk: sistem ini percuma, pelawat hanya perlu mendaftar dengan akaun Google.
 function kadLogMasuk() {
@@ -187,6 +240,7 @@ function kadCourse(c, i) {
   return `<a class="course" href="#/course/${encodeURIComponent(c.slug)}" style="--i:${i}">
     <div class="thumb"><div class="${ART(i)}"></div><span class="acc badge ${khas ? 'vip' : 'free'}">${khas ? h((LABEL_GOL[c.golongan] || '').toUpperCase()) : 'PERCUMA'}</span><span class="play"></span><span class="dur tnum">${c.bil_subject} kuliah</span></div>
     <div class="course-body">
+      ${c.kategori ? `<span class="lencana-kat">${h(c.kategori.nama)}</span>` : ''}
       <p class="course-level">${khas ? `Untuk ${h(LABEL_GOL[c.golongan])}${c.terkunci_golongan ? ' (perlu kod)' : ''}` : 'Terbuka kepada semua'}</p>
       <h3>${h(c.tajuk)}</h3>
       ${c.huraian ? `<p class="course-desc">${h(c.huraian)}</p>` : ''}
@@ -292,6 +346,7 @@ async function lamanAwam() {
   const tonton = slaid[0] || null;
   const peserta = konfig.laman.papar_peserta === 'tidak' ? 0 : ((await dapat('/api/statistik').catch(() => null))?.peserta || 0);
   const artikel = (await dapat('/api/artikel').catch(() => [])).slice(0, 3);
+  const kategori = await dapat('/api/kategori').catch(() => []);
   const menu = `<a href="#/" class="active">Utama</a><a href="#/" data-act="gulung" data-sasaran="courses">Siri kuliah</a>${artikel.length ? '<a href="/artikel">Artikel</a>' : ''}<a href="#/" data-act="gulung" data-sasaran="cara">Cara ia berjalan</a>`;
 
   akar.innerHTML = `<div class="halaman">
@@ -338,7 +393,8 @@ async function lamanAwam() {
         ${ORNAMEN}
         <p style="margin-top:14px">Semua siri percuma. Log masuk dengan akaun Google untuk menonton dan menyimpan kemajuan.</p>
       </div></div>
-      ${senarai.length ? `<div class="course-grid" id="gridCourse" data-skrol>${senarai.map(kadCourse).join('')}</div>`
+      ${cipKategori('gridCourse', kategori)}
+      ${senarai.length ? bekasTapis('gridCourse', senarai, kadCourse, 'class="course-grid" data-skrol')
         : '<div class="panel-card ralat-halaman"><p>Kandungan akan datang. Sila kembali tidak lama lagi.</p></div>'}
     </div>
   </section>
@@ -388,6 +444,7 @@ async function lamanAwam() {
       <div class="foot-bottom">
         <span>&copy; ${new Date().getFullYear()} ${h(konfig.laman.nama)}. Hak cipta terpelihara.</span>
       </div>
+      ${String(konfig.laman.penafian_teks ?? '').trim() ? `<div class="foot-penafian-gelap" role="note"><b>Penafian</b><p>${barisBaru(String(konfig.laman.penafian_teks).trim())}</p></div>` : ''}
     </div>
   </footer>
   </div>${skrinMenu([['Utama', '#/', 'data-act="menu-tutup"'], ['Siri kuliah', '#/', 'data-act="gulung" data-sasaran="courses"'], ...(artikel.length ? [['Artikel', '/artikel', '']] : []), ['Log masuk', '#/masuk', '']])}${barBawah('')}`;
@@ -419,6 +476,8 @@ function halamanMasuk() {
         <p class="lede">Guna akaun Google anda. Akaun baharu dicipta secara automatik.</p>
         <div class="gsi" id="google"></div>
         <p class="nota-gsi">Kami hanya menerima nama dan emel anda daripada Google.</p>
+        ${String(konfig.laman.privasi_teks ?? '').trim() ? `<p class="nota-gsi nota-privasi"><b>Privasi.</b> ${barisBaru(String(konfig.laman.privasi_teks).trim())}</p>` : ''}
+        ${ayatPertama(konfig.laman.penafian_teks) ? `<p class="nota-gsi nota-penafian"><b>Penafian.</b> ${h(ayatPertama(konfig.laman.penafian_teks))}</p>` : ''}
         <div class="auth-foot"><span><a href="#/" class="on">Bahasa Malaysia</a></span><span>${h(konfig.laman.nama)}</span></div>
       </div>
     </div>
@@ -534,14 +593,16 @@ async function dashboard() {
 
 async function kuliahSaya() {
   if (!saya) {
-    const senarai = await dapat('/api/course');
+    const [senarai, kategori] = await Promise.all([dapat('/api/course'), dapat('/api/kategori').catch(() => [])]);
     akar.innerHTML = halamanApp('kuliah', `<div class="halaman"><div class="page-head"><h1>Siri kuliah</h1><p class="sub">Log masuk untuk menyimpan kemajuan anda.</p></div>
-      <div class="course-grid muncul" style="margin-top:16px">${senarai.map(kadCourse).join('')}</div></div>`);
+      ${cipKategori('gridSiri', kategori)}
+      ${senarai.length ? bekasTapis('gridSiri', senarai, kadCourse, 'class="course-grid muncul" style="margin-top:16px"') : '<div class="panel-card ralat-halaman"><p>Belum ada siri.</p></div>'}</div>`);
     return;
   }
-  const siri = await semuaSiri();
+  const [siri, kategori] = await Promise.all([semuaSiri(), dapat('/api/kategori').catch(() => [])]);
   akar.innerHTML = halamanApp('kuliah', `<div class="halaman"><div class="page-head"><nav class="crumb" style="margin-bottom:14px"><a href="#/">Utama</a><span>/</span><span style="color:var(--ink-2)">Kuliah saya</span></nav><h1>Kuliah saya</h1><p class="sub">Semua siri dan kemajuan anda.</p></div>
-    <div class="panel-card" style="margin-top:16px"><div class="muncul">${siri.map(barisSiri).join('') || '<p class="tiada-isi">Kandungan akan datang.</p>'}</div></div></div>`);
+    ${cipKategori('senaraiSiri', kategori)}
+    <div class="panel-card" style="margin-top:16px">${siri.length ? bekasTapis('senaraiSiri', siri, barisSiri, 'class="muncul"') : '<p class="tiada-isi">Kandungan akan datang.</p>'}</div></div>`);
 }
 
 // ---------- siri dan kuliah ----------
@@ -575,6 +636,13 @@ function kadSijil(d) {
       <button type="button" class="btn primary" data-act="dapat-sijil">Dapatkan sijil</button></div><div class="qa-ralat" role="alert" hidden></div></div>`;
 }
 
+// Profil pengajar (F-14): nama, kelayakan/tauliah, institusi, bio. Diisi admin; tiada gambar wajah.
+function kadGuru(g) {
+  if (!g) return '';
+  return `<section class="kad-guru" aria-label="Pengajar"><small class="kad-guru-label">Pengajar</small><h3>${h(g.nama)}</h3>
+    ${g.kelayakan ? `<p class="kad-guru-kelayakan">${h(g.kelayakan)}</p>` : ''}${g.institusi ? `<p class="kad-guru-institusi">${h(g.institusi)}</p>` : ''}
+    ${g.bio ? `<p class="kad-guru-bio">${barisBaru(g.bio)}</p>` : ''}</section>`;
+}
 async function halamanCourse(slug) {
   const d = await dapat('/api/course/' + encodeURIComponent(slug));
   const n = d.subject.length, s = d.subject.filter((x) => x.selesai).length;
@@ -593,7 +661,7 @@ async function halamanCourse(slug) {
       </div>
     </div>
     <div class="lesson-grid" style="margin-top:16px">
-      <div class="lesson-main">${d.log_masuk && n && s === n ? kadSijil(d) : ''}${senaraiKuliah(d, null)}</div>
+      <div class="lesson-main">${d.log_masuk && n && s === n ? kadSijil(d) : ''}${kadGuru(d.guru_profil)}${senaraiKuliah(d, null)}</div>
       ${berkunci && !saya ? `<aside class="lesson-side">${kadLogMasuk()}</aside>` : ''}
     </div>
   </div>`);
@@ -674,6 +742,7 @@ async function halamanSubject(id) {
     <div class="lesson-grid" style="margin-top:16px">
       <div class="lesson-main">
         ${pentas}
+        ${blokRujukan(s.rujukan)}${blokPenafian()}
         <div class="panel" style="margin-top:16px">
           <div class="panel-head"><div class="panel-tabs" role="tablist" aria-label="Bahan kuliah">
             <button role="tab" aria-selected="true" data-act="tab" data-tab="huraian">Huraian kuliah</button>
@@ -787,6 +856,7 @@ function halamanAkaun() {
 // ---------- tindakan ----------
 
 const TINDAKAN = {
+  'tapis-kat': (el) => paparTapis(el.dataset.tapis, el.dataset.kat),
   selesai: (el) => tandaSelesai(el.dataset.id),
   async keluar() { await fetch('/auth/keluar', { method: 'POST' }); saya = null; location.hash = '#/'; laluan(); },
   async 'keluar-semua'() {

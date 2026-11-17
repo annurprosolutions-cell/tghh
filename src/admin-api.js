@@ -7,7 +7,7 @@
 import { json } from './lib/http.js';
 import { bacaKuki, hashToken } from './lib/sesi.js';
 import { perananPenuh, adminEmel, senaraiAdmin } from './lib/peranan.js';
-import { sahkanCourse, sahkanSubject, buatSlug } from './lib/kandungan.js';
+import { sahkanCourse, sahkanSubject, sahkanKategori, sahkanProfilGuru, buatSlug } from './lib/kandungan.js';
 import { sahkanArtikel, slugArtikel, MAKS_ISI } from './lib/artikel.js';
 import { MAKS_LOGO, sahkanTetapan, gabungTetapan, jenisGambar, urlLogo, LALAI } from './lib/tetapan.js';
 import { sahkanJawapan } from './lib/soalan.js';
@@ -19,7 +19,7 @@ const MAKS_BADAN = 50_000;
 const MAKS_MEDIA = 2 * 1024 * 1024; // selepas dikecilkan di pelayar, gambar biasanya < 300 KB
 const EMEL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 // Medan yang perubahannya pada kandungan terbit memerlukan kelulusan (urutan subject dikecualikan: susunan sahaja).
-const MEDAN_SEMAK = { course: ['tajuk', 'huraian', 'golongan'], subject: ['tajuk', 'huraian', 'video_id', 'pratonton', 'tempoh_saat'] };
+const MEDAN_SEMAK = { course: ['tajuk', 'huraian', 'golongan', 'kategori_id'], subject: ['tajuk', 'huraian', 'video_id', 'pratonton', 'tempoh_saat', 'rujukan'] };
 
 const luarSubject = (s) => ({ ...s, pratonton: !!s.pratonton });
 
@@ -55,7 +55,7 @@ export async function adminApi(req, env, url, repo, now) {
   const [sumber, idMentah, anak] = bahagian;
   const id = idDari(idMentah);
 
-  if (!admin && !['course', 'subject', 'nota', 'saya', 'soalan'].includes(sumber)) return json({ ralat: 'tidak-dibenarkan' }, 403);
+  if (!admin && !['course', 'subject', 'nota', 'saya', 'soalan', 'kategori'].includes(sumber)) return json({ ralat: 'tidak-dibenarkan' }, 403);
 
   // Nama guru untuk paparan (emel -> nama).
   const petaGuru = async () => { try { return new Map((await repo.senaraiGuru()).map((g) => [g.emel, g.nama])); } catch { return new Map(); } };
@@ -230,7 +230,38 @@ export async function adminApi(req, env, url, repo, now) {
     return json({ ralat: 'kaedah-tidak-disokong' }, 405);
   }
 
+  // ---------------- kategori (baca: admin dan guru; tulis: admin sahaja) ----------------
+  if (sumber === 'kategori') {
+    if (bahagian.length === 1 && req.method === 'GET') return json(await repo.senaraiKategori());
+    if (!admin) return json({ ralat: 'tidak-dibenarkan' }, 403);
+    if (bahagian.length === 1 && req.method === 'POST') {
+      const b = await bacaJson(req); if (b.gagal) return b.gagal;
+      const v = sahkanKategori(b.nilai); if (!v.ok) return ralatSah(v);
+      const asas = buatSlug(v.nilai.nama);
+      const slug = await repo.slugKategoriUnik(asas === 'course' && !/course/i.test(v.nilai.nama) ? 'kategori' : asas);
+      await repo.ciptaKategori({ ...v.nilai, slug }, masa);
+      return json(await repo.senaraiKategori(), 201);
+    }
+    if (!id) return json({ ralat: 'id-tidak-sah' }, 400);
+    const kat = await repo.kategoriDariId(id);
+    if (!kat) return json({ ralat: 'tidak-dijumpai' }, 404);
+    if (bahagian.length === 2 && req.method === 'PUT') {
+      const b = await bacaJson(req); if (b.gagal) return b.gagal;
+      const v = sahkanKategori(b.nilai, { separa: true }); if (!v.ok) return ralatSah(v);
+      await repo.kemaskiniKategori(id, v.nilai);
+      return json(await repo.senaraiKategori());
+    }
+    if (bahagian.length === 2 && req.method === 'DELETE') {
+      const bil = await repo.bilCourseKategori(id);
+      if (bil > 0) return json({ ralat: 'kategori-digunakan', bil_course: bil }, 409); // pindahkan atau kosongkan kategori siri dahulu
+      await repo.padamKategori(id);
+      return json(await repo.senaraiKategori());
+    }
+    return json({ ralat: 'kaedah-tidak-disokong' }, 405);
+  }
+
   // ---------------- guru (admin) ----------------
+  // Profil awam (kelayakan, institusi, bio) hanya diisi di sini: guru tidak mempunyai laluan untuk menyuntingnya.
   if (sumber === 'guru') {
     if (bahagian.length === 1 && req.method === 'GET') return json(await repo.senaraiGuru());
     if (bahagian.length === 1 && req.method === 'POST') {
@@ -238,8 +269,25 @@ export async function adminApi(req, env, url, repo, now) {
       const emel = String(b.nilai.emel || '').trim().toLowerCase(), nama = String(b.nilai.nama || '').trim();
       if (!EMEL.test(emel) || emel.length > 120) return json({ ralat: 'emel-tidak-sah', medan: 'emel' }, 400);
       if (!nama || nama.length > 80) return json({ ralat: 'nama-tidak-sah', medan: 'nama' }, 400);
+      const profil = sahkanProfilGuru(b.nilai); if (!profil.ok) return ralatSah(profil);
       await repo.simpanGuru(emel, nama, masa);
+      if (Object.keys(profil.nilai).length) await repo.kemaskiniProfilGuru(emel, { ...(await repo.guruDariEmel(emel)), ...profil.nilai });
       return json(await repo.senaraiGuru(), 201);
+    }
+    if (bahagian.length === 2 && req.method === 'PUT') {
+      let emel; try { emel = decodeURIComponent(idMentah).toLowerCase(); } catch { return json({ ralat: 'emel-tidak-sah' }, 400); }
+      const g = await repo.guruDariEmel(emel);
+      if (!g) return json({ ralat: 'tidak-dijumpai' }, 404);
+      const b = await bacaJson(req); if (b.gagal) return b.gagal;
+      const profil = sahkanProfilGuru(b.nilai); if (!profil.ok) return ralatSah(profil);
+      let nama = g.nama;
+      if (b.nilai && 'nama' in b.nilai) {
+        nama = String(b.nilai.nama || '').trim();
+        if (!nama || nama.length > 80) return json({ ralat: 'nama-tidak-sah', medan: 'nama' }, 400);
+      }
+      await repo.simpanGuru(emel, nama, masa);
+      await repo.kemaskiniProfilGuru(emel, { ...g, ...profil.nilai });
+      return json(await repo.senaraiGuru());
     }
     if (bahagian.length === 2 && req.method === 'DELETE') {
       let emel; try { emel = decodeURIComponent(idMentah).toLowerCase(); } catch { return json({ ralat: 'emel-tidak-sah' }, 400); }
@@ -416,6 +464,7 @@ export async function adminApi(req, env, url, repo, now) {
       if (req.method === 'POST') {
         const b = await bacaJson(req); if (b.gagal) return b.gagal;
         const v = sahkanCourse(b.nilai); if (!v.ok) return ralatSah(v);
+        if (v.nilai.kategori_id != null && !(await repo.kategoriDariId(v.nilai.kategori_id))) return json({ ralat: 'kategori-tidak-sah', medan: 'kategori_id' }, 400);
         let guru_emel = saya;
         if (admin) {
           const g = await guruUntuk(b.nilai); if (g.gagal) return g.gagal;
@@ -449,6 +498,7 @@ export async function adminApi(req, env, url, repo, now) {
       if (req.method === 'PUT') {
         const b = await bacaJson(req); if (b.gagal) return b.gagal;
         const v = sahkanCourse(b.nilai, { separa: true }); if (!v.ok) return ralatSah(v);
+        if (v.nilai.kategori_id != null && !(await repo.kategoriDariId(v.nilai.kategori_id))) return json({ ralat: 'kategori-tidak-sah', medan: 'kategori_id' }, 400);
         if (admin) {
           if ('guru_emel' in b.nilai) { const g = await guruUntuk(b.nilai); if (g.gagal) return g.gagal; v.nilai.guru_emel = g.emel; }
           if (v.nilai.status === 'terbit') v.nilai.catatan_semakan = null;

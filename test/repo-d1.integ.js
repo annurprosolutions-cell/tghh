@@ -320,3 +320,93 @@ test('sandaran: semua jadual (kecuali sesi) ke R2 sebagai JSON dengan skema; nam
   assert.equal(senarai.length, SIMPAN);
   assert.equal(senarai[0].nama, '2026-11-10.json');
 });
+
+// ---------- Fasa 2: skema versi 2 (kategori, rujukan, profil guru, laporan) ----------
+
+test('versi 2: kategori awal (seed) wujud, jadual laporan dan indeks dicipta', async () => {
+  assert.deepEqual((await repo.senaraiKategori()).map((k) => k.slug).slice(0, 5), ['pengenalan', 'sejarah-firqah', 'akidah-aliran', 'ideologi-moden', 'gerakan-semasa']);
+  const objek = (await db.prepare(`SELECT name FROM sqlite_master`).all()).results.map((r) => r.name);
+  for (const n of ['kategori', 'laporan', 'laporan_status', 'laporan_pengguna', 'course_kategori']) assert.ok(objek.includes(n), n);
+  const lajur = async (j) => (await db.prepare(`PRAGMA table_info(${j})`).all()).results.map((r) => r.name);
+  assert.ok((await lajur('course')).includes('kategori_id'));
+  assert.ok((await lajur('subject')).includes('rujukan'));
+  for (const k of ['kelayakan', 'institusi', 'bio']) assert.ok((await lajur('guru')).includes(k), k);
+});
+
+test('kategori: cipta, slug unik, ubah, kiraan siri, tugaskan kepada siri dan tapis', async () => {
+  const k = await repo.ciptaKategori({ nama: 'Ujian Kategori', slug: await repo.slugKategoriUnik('ujian-kategori') }, 't');
+  const k2 = await repo.ciptaKategori({ nama: 'Ujian Kategori', slug: await repo.slugKategoriUnik('ujian-kategori') }, 't');
+  assert.deepEqual([k.slug, k2.slug], ['ujian-kategori', 'ujian-kategori-2']);
+  assert.ok(k2.urutan > k.urutan);
+  await assert.rejects(repo.ciptaKategori({ nama: 'X', slug: 'ujian-kategori' }, 't')); // slug UNIQUE
+  assert.equal((await repo.kemaskiniKategori(k.id, { nama: 'Ujian Baharu', slug: 'dirampas', id: 1 })).slug, 'ujian-kategori'); // slug dan id tidak boleh ditukar
+  const c = await repo.ciptaCourse({ tajuk: 'Siri Kategori', slug: await repo.slugUnik('siri-kategori'), status: 'terbit', kategori_id: k.id }, 't');
+  assert.equal(c.kategori_id, k.id);
+  assert.equal(await repo.bilCourseKategori(k.id), 1);
+  const baris = (await repo.senaraiKategori()).find((x) => x.id === k.id);
+  assert.deepEqual([baris.nama, baris.bil_course, baris.bil_course_terbit], ['Ujian Baharu', 1, 1]);
+  assert.equal((await repo.kemaskiniCourse(c.id, { kategori_id: k2.id }, 't')).kategori_id, k2.id);
+  assert.equal((await repo.kemaskiniCourse(c.id, { kategori_id: null }, 't')).kategori_id, null);
+  assert.equal(await repo.bilCourseKategori(k.id), 0);
+  await repo.padamKategori(k.id);
+  assert.equal(await repo.kategoriDariId(k.id), null);
+});
+
+test('kategori: kunci asing menghalang kategori yang tidak wujud pada siri', async () => {
+  await assert.rejects(repo.ciptaCourse({ tajuk: 'Yatim', slug: 'yatim-kategori', status: 'draf', kategori_id: 987654 }, 't'));
+});
+
+test('rujukan: teks Arab dan baris baharu kekal utuh dalam pangkalan data', async () => {
+  const c = await repo.ciptaCourse({ tajuk: 'Siri Rujukan', slug: await repo.slugUnik('siri-rujukan'), status: 'terbit' }, 't');
+  const teks = '1. Al-Milal wa al-Nihal, j. 1, m/s 20\n2. قال الله تعالى: ﴿إِنَّ الدِّينَ عِندَ اللَّهِ الْإِسْلَامُ﴾\n3. <script>alert(1)</script>';
+  const s = await repo.ciptaSubject(c.id, { tajuk: 'K1', video_id: 'aaaaaaaaaaa', status: 'terbit', rujukan: teks }, 't');
+  assert.equal(s.rujukan, teks);
+  assert.equal((await repo.kemaskiniSubject(s.id, { rujukan: 'baharu' }, 't')).rujukan, 'baharu');
+  assert.equal((await repo.kemaskiniSubject(s.id, { rujukan: null }, 't')).rujukan, null);
+  assert.equal((await repo.ciptaSubject(c.id, { tajuk: 'K2', status: 'draf' }, 't')).rujukan, null);
+});
+
+test('profil guru: simpanGuru tidak memadam profil; kemaskiniProfilGuru; senaraiGuru membawa medan profil', async () => {
+  await repo.simpanGuru('profil@gmail.com', 'Ustaz P', 't');
+  await repo.kemaskiniProfilGuru('profil@gmail.com', { kelayakan: 'Sarjana', institusi: 'Institut', bio: 'Bio ringkas' });
+  await repo.simpanGuru('profil@gmail.com', 'Ustaz P2', 't2'); // tukar nama sahaja
+  const g = await repo.guruDariEmel('profil@gmail.com');
+  assert.deepEqual([g.nama, g.kelayakan, g.institusi, g.bio], ['Ustaz P2', 'Sarjana', 'Institut', 'Bio ringkas']);
+  assert.equal((await repo.senaraiGuru()).find((x) => x.emel === 'profil@gmail.com').institusi, 'Institut');
+  await repo.kemaskiniProfilGuru('profil@gmail.com', { kelayakan: null, institusi: null, bio: null });
+  assert.equal((await repo.guruDariEmel('profil@gmail.com')).bio, null);
+});
+
+test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai, versi = 2, dijalankan berulang selamat', async () => {
+  const p2 = await getPlatformProxy({ configPath: 'wrangler.uji.toml', persist: false });
+  try {
+    const d = p2.env.DB;
+    // Pangkalan data lama: hanya langkah versi 1, versi direkod = 1, ada data hidup
+    await d.batch([...LANGKAH[0].map((s) => d.prepare(s)), d.prepare(`INSERT INTO tetapan (kunci, nilai) VALUES ('skema_versi', '1')`)]);
+    await d.batch([
+      d.prepare(`INSERT INTO pengguna (emel, google_sub, nama, peranan, golongan, dicipta_pada) VALUES ('lama@gmail.com', 'g1', 'Lama', 'pelajar', 'awam', 't')`),
+      d.prepare(`INSERT INTO course (tajuk, slug, huraian, status, urutan, golongan, dicipta_pada, dikemas_kini_pada) VALUES ('Siri Lama', 'siri-lama', 'h', 'terbit', 1, 'awam', 't', 't')`),
+      d.prepare(`INSERT INTO subject (course_id, tajuk, urutan, pratonton, status, video_sumber, video_id, dicipta_pada, dikemas_kini_pada) VALUES (1, 'K Lama', 1, 1, 'terbit', 'youtube', 'aaaaaaaaaaa', 't', 't')`),
+      d.prepare(`INSERT INTO guru (emel, nama, dicipta_pada) VALUES ('guru@lama.com', 'Guru Lama', 't')`),
+    ]);
+    _setSemula();
+    await pastikanSkema(d);
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
+    assert.equal(LANGKAH.length, 2);
+    const r = repoD1(d);
+    const c = await r.courseDariSlug('siri-lama');
+    assert.deepEqual([c.tajuk, c.status, c.kategori_id], ['Siri Lama', 'terbit', null]);
+    const s = (await r.senaraiSubject(c.id))[0];
+    assert.deepEqual([s.tajuk, s.video_id, s.pratonton, s.rujukan], ['K Lama', 'aaaaaaaaaaa', 1, null]);
+    const g = await r.guruDariEmel('guru@lama.com');
+    assert.deepEqual([g.nama, g.kelayakan, g.institusi, g.bio], ['Guru Lama', null, null, null]);
+    assert.equal((await r.penggunaDariEmel('lama@gmail.com')).nama, 'Lama');
+    assert.equal((await r.senaraiKategori()).length, 5);
+    // Dijalankan semula (deploy semula, buka laman beberapa kali): tiada ralat, data dan seed tidak berganda
+    for (let i = 0; i < 3; i++) { _setSemula(); await pastikanSkema(d); }
+    await Promise.all([(_setSemula(), pastikanSkema(d)), pastikanSkema(d)]);
+    assert.equal((await r.senaraiKategori()).length, 5);
+    assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM course').first()).c, 1);
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '2');
+  } finally { await p2.dispose(); }
+});
