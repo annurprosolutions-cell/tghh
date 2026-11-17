@@ -7,7 +7,7 @@ const SENARAI = [['ikon-192.png', 192, 22, 62], ['ikon-512.png', 512, 22, 62], [
 const b = await chromium.launch();
 for (const [fail, s, jejari, tanda] of SENARAI) {
   const p = await b.newPage({ viewport: { width: s, height: s } });
-  await p.setContent(`<html><body style="margin:0;background:transparent"><div style="width:${s}px;height:${s}px;border-radius:${jejari}%;background:#0B6B4F;display:grid;place-items:center"><div style="width:${tanda}%;height:${tanda}%">${MARK}</div></div></body></html>`);
+  await p.setContent(`<html><body style="margin:0;background:transparent"><div style="width:${s}px;height:${s}px;border-radius:${jejari}%;background:#6D28D9;display:grid;place-items:center"><div style="width:${tanda}%;height:${tanda}%">${MARK}</div></div></body></html>`);
   await p.screenshot({ path: `public/ikon/${fail}`, omitBackground: jejari > 0 });
   await p.close();
 }

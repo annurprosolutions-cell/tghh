@@ -1,5 +1,5 @@
 # Konfigurasi Worker. Tiga nilai bertanda TUKAR mesti diisi sebelum deploy pertama (lihat PANDUAN dalam skill).
-name = "lms-saya"                 # TUKAR: nama Worker (huruf kecil, nombor, sempang). Jadi sebahagian alamat workers.dev
+name = "haraki-hub"                 # TUKAR: nama Worker (huruf kecil, nombor, sempang). Jadi sebahagian alamat workers.dev
 main = "src/worker.js"
 compatibility_date = "2026-10-01"
 
@@ -12,12 +12,12 @@ run_worker_first = ["/api/*", "/auth/*", "/artikel", "/artikel/*", "/sitemap.xml
 # Bukan rahsia. Sistem ini tidak memerlukan sebarang rahsia (secret).
 [vars]
 GOOGLE_CLIENT_ID = ""             # TUKAR: Client ID daripada Google Cloud (berakhir .apps.googleusercontent.com)
-ADMIN_EMELS = ""                  # TUKAR: emel Google pemilik (admin utama). Lebih seorang: pisahkan dengan koma
+ADMIN_EMELS = "ruzbihanbakhtiar94@gmail.com"                  # TUKAR: emel Google pemilik (admin utama). Lebih seorang: pisahkan dengan koma
 SITE_URL = ""                     # Pilihan: alamat domain sendiri (contoh https://kelassaya.com). Kosong = alamat semasa
 
 [[d1_databases]]
 binding = "DB"
-database_name = "lms-saya"        # nama pangkalan data D1 yang dicipta di dashboard
+database_name = "haraki-hub"        # nama pangkalan data D1 yang dicipta di dashboard
 database_id = ""                  # TUKAR: Database ID daripada dashboard D1 (bukan rahsia)
 
 # PILIHAN (perlu daftar kad di Cloudflare walaupun percuma): storan R2 untuk nota PDF, logo, gambar artikel dan

@@ -10,7 +10,7 @@ export const WARNA = {
 };
 
 export const MEDAN = {
-  nama: { maks: 60, lalai: 'Kelas Saya' },
+  nama: { maks: 60, lalai: 'Haraki Hub' },
   tagline: { maks: 60, lalai: 'Belajar bila-bila masa' },
   hero_tajuk: { maks: 120, lalai: 'Belajar tanpa terikat masa dan tempat.' },
   hero_teks: { maks: 300, lalai: 'Setiap kuliah dalam bentuk video yang boleh ditonton bila-bila masa. Daftar percuma dengan akaun Google dan terus mula belajar.' },
@@ -21,7 +21,7 @@ export const MEDAN = {
   sijil_penandatangan: { maks: 80, lalai: '' }, // nama di bawah garis tandatangan; kosong = nama guru course
   sijil_jawatan: { maks: 80, lalai: '' },
   hari_sesi: { maks: 3, lalai: '30' },
-  warna: { maks: 10, lalai: 'hijau' }, // tempoh log masuk (hari) sebelum perlu log masuk semula; 1 hingga 365
+  warna: { maks: 10, lalai: 'ungu' }, // warna tema lalai (hijau, biru, ungu, marun, arang)
 };
 export const LALAI = Object.fromEntries(Object.entries(MEDAN).map(([k, v]) => [k, v.lalai]));
 

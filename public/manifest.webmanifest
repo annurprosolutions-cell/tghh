@@ -1,14 +1,14 @@
 {
-  "name": "Kelas Saya",
-  "short_name": "Kelas Saya",
+  "name": "Haraki Hub",
+  "short_name": "Haraki Hub",
   "description": "Platform pembelajaran dalam talian.",
   "lang": "ms",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#E9F1ED",
-  "theme_color": "#0B6B4F",
+  "background_color": "#EFEAF8",
+  "theme_color": "#6D28D9",
   "icons": [
     {
       "src": "/ikon/ikon-192.png",

@@ -16,7 +16,7 @@ const dua = (n) => String(n).padStart(2, '0');
 
 // `laman` datang dari tetapan admin (/api/konfig); nilai di sini hanya sandaran jika permintaan gagal.
 let konfig = { googleClientId: '', laman: {
-  nama: 'Kelas Saya', tagline: 'Belajar bila-bila masa', hero_tajuk: 'Belajar tanpa terikat masa dan tempat.',
+  nama: 'Haraki Hub', tagline: 'Belajar bila-bila masa', hero_tajuk: 'Belajar tanpa terikat masa dan tempat.',
   hero_teks: 'Setiap kuliah dalam bentuk video yang boleh ditonton bila-bila masa. Daftar percuma dengan akaun Google dan terus mula belajar.',
   footer_teks: 'Platform pembelajaran dalam talian. Percuma untuk semua pelajar yang mendaftar.', emel_hubungan: '', logo: null } };
 let saya = null; // { pengguna, golongan } atau null jika pelawat
