@@ -13,7 +13,7 @@ run_worker_first = ["/api/*", "/auth/*", "/artikel", "/artikel/*", "/sitemap.xml
 [vars]
 GOOGLE_CLIENT_ID = "211831822510-50uj4esv22imapb607qq09j72duooqa1.apps.googleusercontent.com"             # TUKAR: Client ID daripada Google Cloud (berakhir .apps.googleusercontent.com)
 ADMIN_EMELS = "ruzbihanbakhtiar94@gmail.com"                  # TUKAR: emel Google pemilik (admin utama). Lebih seorang: pisahkan dengan koma
-SITE_URL = ""                     # Pilihan: alamat domain sendiri (contoh https://kelassaya.com). Kosong = alamat semasa
+SITE_URL = "https://harakihub.annurpro.com"                     # Pilihan: alamat domain sendiri (contoh https://kelassaya.com). Kosong = alamat semasa
 
 [[d1_databases]]
 binding = "DB"
