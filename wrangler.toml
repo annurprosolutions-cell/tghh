@@ -18,7 +18,7 @@ SITE_URL = ""                     # Pilihan: alamat domain sendiri (contoh https
 [[d1_databases]]
 binding = "DB"
 database_name = "haraki-hub"        # nama pangkalan data D1 yang dicipta di dashboard
-database_id = ""                  # TUKAR: Database ID daripada dashboard D1 (bukan rahsia)
+database_id = "6073ba82-a33e-474e-b9af-9ecddaaa1e3a"                  # TUKAR: Database ID daripada dashboard D1 (bukan rahsia)
 
 # PILIHAN (perlu daftar kad di Cloudflare walaupun percuma): storan R2 untuk nota PDF, logo, gambar artikel dan
 # sandaran harian. Buang tanda # pada baris di bawah selepas bucket dicipta. Tanpa R2, ciri lain tetap berfungsi.
