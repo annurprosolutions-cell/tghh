@@ -1,8 +1,8 @@
 // Semua akses D1 di satu tempat. Ujian memakai repo dalam memori dengan antara muka yang sama (test/repo-palsu.js).
 
-const KOLUM_COURSE = ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan', 'kategori_id'];
+const KOLUM_COURSE = ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan', 'kategori_id', 'thumbnail'];
 const KOLUM_ARTIKEL = ['slug', 'tajuk', 'ringkasan', 'meta_description', 'gambar', 'gambar_alt', 'isi', 'bil_perkataan', 'status', 'diterbit_pada'];
-const KOLUM_SUBJECT = ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan', 'rujukan'];
+const KOLUM_SUBJECT = ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan', 'rujukan', 'video_sumber', 'thumbnail'];
 
 export function repoD1(db) {
   const satu = (sql, ...p) => db.prepare(sql).bind(...p).first();
@@ -91,9 +91,9 @@ export function repoD1(db) {
     },
     async ciptaCourse(c, masa) {
       const r = await jalan(
-        `INSERT INTO course (tajuk, slug, huraian, status, urutan, guru_emel, golongan, kategori_id, dicipta_pada, dikemas_kini_pada)
-         VALUES (?, ?, ?, ?, COALESCE(?, (SELECT COALESCE(MAX(urutan), 0) + 1 FROM course)), ?, ?, ?, ?, ?)`,
-        c.tajuk, c.slug, c.huraian ?? null, c.status, c.urutan ?? null, c.guru_emel ?? null, c.golongan || 'awam', c.kategori_id ?? null, masa, masa);
+        `INSERT INTO course (tajuk, slug, huraian, status, urutan, guru_emel, golongan, kategori_id, thumbnail, dicipta_pada, dikemas_kini_pada)
+         VALUES (?, ?, ?, ?, COALESCE(?, (SELECT COALESCE(MAX(urutan), 0) + 1 FROM course)), ?, ?, ?, ?, ?, ?)`,
+        c.tajuk, c.slug, c.huraian ?? null, c.status, c.urutan ?? null, c.guru_emel ?? null, c.golongan || 'awam', c.kategori_id ?? null, c.thumbnail ?? null, masa, masa);
       return satu('SELECT * FROM course WHERE id = ?', r.meta.last_row_id);
     },
     async kemaskiniCourse(id, nilai, masa) {
@@ -112,9 +112,9 @@ export function repoD1(db) {
     subjectDariId: (id) => satu('SELECT * FROM subject WHERE id = ?', id),
     async ciptaSubject(courseId, v, masa) {
       const r = await jalan(
-        `INSERT INTO subject (course_id, tajuk, huraian, urutan, pratonton, status, video_sumber, video_id, tempoh_saat, rujukan, dicipta_pada, dikemas_kini_pada)
-         VALUES (?, ?, ?, COALESCE(?, (SELECT COALESCE(MAX(urutan), 0) + 1 FROM subject WHERE course_id = ?)), ?, ?, 'youtube', ?, ?, ?, ?, ?)`,
-        courseId, v.tajuk, v.huraian ?? null, v.urutan ?? null, courseId, v.pratonton ?? 0, v.status ?? 'draf', v.video_id ?? null, v.tempoh_saat ?? null, v.rujukan ?? null, masa, masa);
+        `INSERT INTO subject (course_id, tajuk, huraian, urutan, pratonton, status, video_sumber, video_id, tempoh_saat, rujukan, thumbnail, dicipta_pada, dikemas_kini_pada)
+         VALUES (?, ?, ?, COALESCE(?, (SELECT COALESCE(MAX(urutan), 0) + 1 FROM subject WHERE course_id = ?)), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        courseId, v.tajuk, v.huraian ?? null, v.urutan ?? null, courseId, v.pratonton ?? 0, v.status ?? 'draf', v.video_sumber ?? 'youtube', v.video_id ?? null, v.tempoh_saat ?? null, v.rujukan ?? null, v.thumbnail ?? null, masa, masa);
       return satu('SELECT * FROM subject WHERE id = ?', r.meta.last_row_id);
     },
     async kemaskiniSubject(id, nilai, masa) {
@@ -188,21 +188,29 @@ export function repoD1(db) {
       return satu('SELECT * FROM laporan WHERE id = ?', id);
     },
 
+    // Gambar automatik siri daripada video kuliah terbit (tertib urutan). hanyaPratonton: untuk pelawat (video terbuka sahaja).
+    // Pulangkan baris { course_id, video_sumber, video_id }; pemanggil memilih yang pertama bagi setiap siri.
+    async videoUntukGambarSiri({ hanyaPratonton = false } = {}) {
+      return (await db.prepare(`SELECT s.course_id, s.video_sumber, s.video_id FROM subject s JOIN course c ON c.id = s.course_id
+        WHERE s.status = 'terbit' AND c.status = 'terbit' AND s.video_id IS NOT NULL ${hanyaPratonton ? 'AND s.pratonton = 1' : ''}
+        ORDER BY s.course_id, s.urutan, s.id`).all()).results;
+    },
+
     // ---- guru dan kelulusan ----
     async senaraiGuru() {
-      return (await db.prepare(`SELECT g.emel, g.nama, g.kelayakan, g.institusi, g.bio, g.dicipta_pada, (SELECT COUNT(*) FROM course c WHERE c.guru_emel = g.emel) AS bil_course
+      return (await db.prepare(`SELECT g.emel, g.nama, g.kelayakan, g.institusi, g.bio, g.gambar, g.dicipta_pada, (SELECT COUNT(*) FROM course c WHERE c.guru_emel = g.emel) AS bil_course
         FROM guru g ORDER BY g.nama`).all()).results;
     },
     guruDariEmel: (emel) => satu('SELECT * FROM guru WHERE emel = ?', emel),
     simpanGuru: (emel, nama, masa) => jalan('INSERT INTO guru (emel, nama, dicipta_pada) VALUES (?, ?, ?) ON CONFLICT(emel) DO UPDATE SET nama = excluded.nama', emel, nama, masa),
     // Profil awam guru (F-14). Hanya laluan admin memanggil ini; guru tidak boleh menyunting sendiri.
     async kemaskiniProfilGuru(emel, p) {
-      await jalan('UPDATE guru SET kelayakan = ?, institusi = ?, bio = ? WHERE emel = ?', p.kelayakan ?? null, p.institusi ?? null, p.bio ?? null, emel);
+      await jalan('UPDATE guru SET kelayakan = ?, institusi = ?, bio = ?, gambar = ? WHERE emel = ?', p.kelayakan ?? null, p.institusi ?? null, p.bio ?? null, p.gambar ?? null, emel);
       return satu('SELECT * FROM guru WHERE emel = ?', emel);
     },
     padamGuru: (emel) => jalan('DELETE FROM guru WHERE emel = ?', emel),
     async subjectMenunggu() {
-      return (await db.prepare(`SELECT s.id, s.tajuk, s.video_id, s.course_id, c.tajuk AS course_tajuk, c.guru_emel FROM subject s JOIN course c ON c.id = s.course_id
+      return (await db.prepare(`SELECT s.id, s.tajuk, s.video_id, s.video_sumber, s.thumbnail, s.course_id, c.tajuk AS course_tajuk, c.guru_emel FROM subject s JOIN course c ON c.id = s.course_id
         WHERE s.status = 'menunggu' ORDER BY s.id`).all()).results;
     },
     async kiraKhatam(courseId) {

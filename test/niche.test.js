@@ -228,12 +228,12 @@ test('profil guru: admin mengisi; dipapar kepada awam tanpa emel; guru tidak bol
   await A('POST', `/api/admin/course/${c.id}/subject`, { tajuk: 'K1', video: V1, status: 'terbit' });
   // belum diisi: nama sahaja
   let d = (await awam('GET', `/api/course/${c.slug}`)).b;
-  assert.deepEqual(d.guru_profil, { nama: 'Ustaz Ali', kelayakan: null, institusi: null, bio: null });
+  assert.deepEqual(d.guru_profil, { nama: 'Ustaz Ali', kelayakan: null, institusi: null, bio: null, gambar: null });
   const r = await A('PUT', '/api/admin/guru/guru%40gmail.com', { kelayakan: 'Sarjana Usuluddin; Tauliah JAIS', institusi: 'Institut Ilmu', bio: 'Mengajar sejak 2010.' });
   assert.equal(r.status, 200);
   assert.equal(r.b[0].kelayakan, 'Sarjana Usuluddin; Tauliah JAIS');
   d = (await awam('GET', `/api/course/${c.slug}`)).b;
-  assert.deepEqual(d.guru_profil, { nama: 'Ustaz Ali', kelayakan: 'Sarjana Usuluddin; Tauliah JAIS', institusi: 'Institut Ilmu', bio: 'Mengajar sejak 2010.' });
+  assert.deepEqual(d.guru_profil, { nama: 'Ustaz Ali', kelayakan: 'Sarjana Usuluddin; Tauliah JAIS', institusi: 'Institut Ilmu', bio: 'Mengajar sejak 2010.', gambar: null });
   assert.equal(JSON.stringify(d).includes('guru@gmail.com'), false);
   // guru dan ahli ditolak oleh server
   assert.equal((await G('PUT', '/api/admin/guru/guru%40gmail.com', { kelayakan: 'Profesor Agung' })).status, 403);

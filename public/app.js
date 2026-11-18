@@ -47,6 +47,10 @@ function blokPenafian() {
   const t = String(konfig.laman.penafian_teks ?? '').trim();
   return t ? `<aside class="penafian" role="note">${IKON_INFO}<p>${barisBaru(t)}</p></aside>` : '';
 }
+// Gambar thumbnail (Google Drive atau laluan /api/gambar/...). Jika gagal dimuatkan, elemen dibuang dan corak lalai kelihatan.
+const imgGambar = (url, kelas = 'gambar') => (url ? `<img class="${kelas}" data-gambar src="${h(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '');
+document.addEventListener('error', (e) => { const t = e.target; if (t && t.tagName === 'IMG' && t.hasAttribute('data-gambar')) t.remove(); }, true);
+
 // Ringkasan dengan "Lihat lagi": huraian panjang dipotong pada sempadan perkataan dan dikembangkan oleh pengguna.
 // Teks pendek dipapar penuh tanpa butang. Semua teks melalui h(); baris baharu hanya selepas escape.
 const MAKS_RINGKAS = 140;
@@ -251,7 +255,7 @@ function kadCourse(c, i) {
     ? `<span class="kemajuan-kecil"><span class="bar-mini"><i style="width:${pct(c.selesai, c.bil_subject)}%"></i></span>${c.selesai}/${c.bil_subject}</span>`
     : '<span class="kemajuan-kecil">Mula tonton</span>';
   return `<a class="course" href="#/course/${encodeURIComponent(c.slug)}" style="--i:${i}">
-    <div class="thumb"><div class="${ART(i)}"></div><span class="acc badge ${khas ? 'vip' : 'free'}">${khas ? h((LABEL_GOL[c.golongan] || '').toUpperCase()) : 'PERCUMA'}</span><span class="play"></span><span class="dur tnum">${c.bil_subject} kuliah</span></div>
+    <div class="thumb"><div class="${ART(i)}"></div>${imgGambar(c.gambar)}<span class="acc badge ${khas ? 'vip' : 'free'}">${khas ? h((LABEL_GOL[c.golongan] || '').toUpperCase()) : 'PERCUMA'}</span><span class="play"></span><span class="dur tnum">${c.bil_subject} kuliah</span></div>
     <div class="course-body">
       ${c.kategori ? `<span class="lencana-kat">${h(c.kategori.nama)}</span>` : ''}
       <p class="course-level">${khas ? `Untuk ${h(LABEL_GOL[c.golongan])}${c.terkunci_golongan ? ' (perlu kod)' : ''}` : 'Terbuka kepada semua'}</p>
@@ -266,8 +270,12 @@ function kadCourse(c, i) {
 const MAKS_SLAID = 6;
 const IKON_KIRI = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const IKON_KANAN = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const ptr = (s) => `<a class="preview-poster" href="#/subject/${s.id}" aria-label="Buka ${h(s.tajuk)}"><div class="${ART(s.id)}"></div><div class="stage-veil"></div><span class="play"></span></a>`;
-const videoEmbed = (s) => `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(s.video_id)}?rel=0&modestbranding=1&playsinline=1" title="${h(s.tajuk)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+const ptr = (s) => `<a class="preview-poster" href="#/subject/${s.id}" aria-label="Buka ${h(s.tajuk)}"><div class="${ART(s.id)}"></div>${imgGambar(s.gambar)}<div class="stage-veil"></div><span class="play"></span></a>`;
+// Video Google Drive dimainkan dengan pemain /preview Drive (tiada acara tamat, jadi tiada khatam automatik). YouTube: pemain tanpa kuki.
+const videoEmbed = (s) => (s.video_sumber === 'drive'
+  ? `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(s.video_id)}/preview" title="${h(s.tajuk)}" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+  : videoEmbedYt(s));
+const videoEmbedYt = (s) => `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(s.video_id)}?rel=0&modestbranding=1&playsinline=1" title="${h(s.tajuk)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
 
 // Kad pratonton hero: satu atau lebih kuliah pratonton (boleh ditonton tanpa log masuk). Lebih daripada satu: titik boleh diklik, anak panah, dan leret (swipe).
 function kadKarusel(slaid) {
@@ -354,7 +362,7 @@ async function lamanAwam() {
   susunan.forEach((c, i) => (butiran[i]?.subject || []).forEach((s) => { if (s.boleh_tonton) calon.push({ id: s.id, tajuk: s.tajuk, course: c }); }));
   const slaid = (await Promise.all(calon.slice(0, MAKS_SLAID).map(async (t) => {
     const d = await dapat('/api/subject/' + t.id).catch(() => null);
-    return { ...t, video_id: d?.subject?.video_id || '', huraian: d?.subject?.huraian || d?.course?.huraian || '' };
+    return { ...t, video_id: d?.subject?.video_id || '', video_sumber: d?.subject?.video_sumber, gambar: d?.subject?.gambar || '', huraian: d?.subject?.huraian || d?.course?.huraian || '' };
   })));
   const tonton = slaid[0] || null;
   const peserta = konfig.laman.papar_peserta === 'tidak' ? 0 : ((await dapat('/api/statistik').catch(() => null))?.peserta || 0);
@@ -534,7 +542,7 @@ async function semuaSiri() {
 function barisSiri(c, i) {
   const n = c.subject.length, s = c.subject.filter((x) => x.selesai).length, p = pct(s, n);
   return `<a class="mycourse" href="#/course/${encodeURIComponent(c.slug)}" style="--i:${i}">
-    <div class="thumb-sm"><div class="${ART(i)}"></div></div>
+    <div class="thumb-sm"><div class="${ART(i)}"></div>${imgGambar(c.gambar)}</div>
     <div class="mc"><b>${h(c.tajuk)}</b><small>${s ? `${s} daripada ${n} kuliah` : `Belum mula · ${n} kuliah`}</small><div class="bar ${p === 100 ? 'ok' : ''}"><i style="width:${p}%"></i></div></div>
     <span class="pct tnum">${p}%</span></a>`;
 }
@@ -653,9 +661,9 @@ function kadSijil(d) {
 // Profil pengajar (F-14): nama, kelayakan/tauliah, institusi, bio. Diisi admin; tiada gambar wajah.
 function kadGuru(g) {
   if (!g) return '';
-  return `<section class="kad-guru" aria-label="Pengajar"><small class="kad-guru-label">Pengajar</small><h3>${h(g.nama)}</h3>
+  return `<section class="kad-guru${g.gambar ? ' ada-foto' : ''}" aria-label="Pengajar">${imgGambar(g.gambar, 'kad-guru-foto')}<div class="kad-guru-isi"><small class="kad-guru-label">Pengajar</small><h3>${h(g.nama)}</h3>
     ${g.kelayakan ? `<p class="kad-guru-kelayakan">${h(g.kelayakan)}</p>` : ''}${g.institusi ? `<p class="kad-guru-institusi">${h(g.institusi)}</p>` : ''}
-    ${g.bio ? `<p class="kad-guru-bio">${barisBaru(g.bio)}</p>` : ''}</section>`;
+    ${g.bio ? `<p class="kad-guru-bio">${barisBaru(g.bio)}</p>` : ''}</div></section>`;
 }
 async function halamanCourse(slug) {
   const d = await dapat('/api/course/' + encodeURIComponent(slug));
@@ -813,8 +821,10 @@ async function halamanSubject(id) {
   const s = d.subject;
   const n = siri.subject.length, khatam = siri.subject.filter((x) => x.selesai).length;
   const pentas = s.boleh_tonton
-    ? `<div class="player"><div class="stage"><div class="${ART(d.kedudukan - 1)} stage-art"></div><div class="stage-veil"></div><div id="pemain"></div></div></div>`
-    : `<div class="player"><div class="stage"><div class="${ART(d.kedudukan - 1)} stage-art"></div><div class="stage-veil"></div>
+    ? `<div class="player"><div class="stage"><div class="${ART(d.kedudukan - 1)} stage-art"></div><div class="stage-veil"></div>${s.video_sumber === 'drive'
+        ? `<iframe id="pemain" src="https://drive.google.com/file/d/${encodeURIComponent(s.video_id)}/preview" title="${h(s.tajuk)}" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+        : '<div id="pemain"></div>'}</div></div>${s.video_sumber === 'drive' ? '<p class="nota-drive">Video ini dihoskan di Google Drive. Selepas menonton hingga habis, tekan <b>Tandakan selesai</b> di atas.</p>' : ''}`
+    : `<div class="player"><div class="stage"><div class="${ART(d.kedudukan - 1)} stage-art"></div>${imgGambar(s.gambar)}<div class="stage-veil"></div>
         <div class="stage-kunci"><span>${KUNCI}</span></div>
         <div class="stage-caption"><small>${s.sebab === 'perlu-golongan' ? `Untuk ${LABEL_GOL[d.course.golongan] || 'golongan tertentu'}` : 'Log masuk untuk menonton'}</small><b>${h(s.tajuk)}</b></div></div></div>
        <div style="margin-top:16px">${s.sebab === 'perlu-golongan' ? kadGolongan(d.course.golongan) : kadLogMasuk()}</div>`;
@@ -854,7 +864,7 @@ async function halamanSubject(id) {
       <aside class="lesson-side">${senaraiKuliah(siri, s.id)}</aside>
     </div>
   </div>`);
-  if (s.boleh_tonton && s.video_id) mainkan(s);
+  if (s.boleh_tonton && s.video_id && s.video_sumber !== 'drive') mainkan(s);
 }
 
 function butangSelesai(s) {

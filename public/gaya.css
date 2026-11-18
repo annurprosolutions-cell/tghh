@@ -486,3 +486,15 @@ a.course:hover .thumb>div:first-child{transform:scale(1.07)}
 .lihat-lagi{display:inline;padding:6px 2px;margin:0;border:0;background:none;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px;-webkit-tap-highlight-color:transparent}
 .lihat-lagi:focus-visible{outline:3px solid var(--accent-soft);border-radius:4px}
 .ringkas{overflow-wrap:anywhere}
+
+/* ===== Thumbnail siri/kuliah, foto guru, video Google Drive ===== */
+.thumb img.gambar,.thumb-sm img.gambar,.stage>img.gambar,.preview-poster img.gambar{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#0A1122}
+.stage>img.gambar{z-index:1}
+.preview-poster img.gambar{z-index:0}
+a.course .thumb>img.gambar{transition:transform .7s var(--ease)}
+a.course:hover .thumb>img.gambar{transform:scale(1.04)}
+.kad-guru.ada-foto{display:flex;gap:14px;align-items:flex-start}
+.kad-guru-foto{flex:none;width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--surface-2);border:1px solid var(--line)}
+.kad-guru-isi{min-width:0;flex:1}
+.nota-drive{margin:10px 0 0;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-2);font-size:13px;line-height:1.5}
+@media (prefers-reduced-motion:reduce){a.course .thumb>img.gambar{transition:none !important}}

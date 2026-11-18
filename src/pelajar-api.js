@@ -9,6 +9,7 @@ import { kepalaKandungan } from './lib/nota.js';
 import { golonganEfektif, keterlihatan, normalKod, kodBolehGuna, tamatSelepasTebus, LABEL } from './lib/golongan.js';
 import { perananPenuh } from './lib/peranan.js';
 import { ciriAktif } from './lib/tetapan.js';
+import { urlGambar, urlGambarVideo } from './lib/media.js';
 import { kodSijil, sahkanNamaSijil, layakSijil } from './lib/sijil.js';
 import { sahkanSoalan, namaPertama, awalHari, HAD_SEHARI } from './lib/soalan.js';
 import { sahkanLaporan, HAD_LAPORAN_SEHARI } from './lib/laporan.js';
@@ -23,7 +24,15 @@ async function konteks(req, env, repo, now) {
   return { pengguna, hari, peranan, golongan: golonganEfektif(pengguna, hari, peranan).golongan };
 }
 
-const courseAwam = (c, guru, kategori) => ({ id: c.id, slug: c.slug, tajuk: c.tajuk, huraian: c.huraian ?? null, golongan: c.golongan || 'awam', guru: (c.guru_emel && guru?.get(c.guru_emel)) || null,
+// Siri yang ada kuliah pertama yang boleh dilihat pengguna ini (pelawat: video terbuka sahaja) supaya gambar automatik wujud.
+// Pulangkan peta course_id -> baris video pertama. Baris video tidak pernah dihantar ke pelayar.
+async function videoGambarSiri(repo, logMasuk) {
+  const m = new Map();
+  try { for (const r of await repo.videoUntukGambarSiri({ hanyaPratonton: !logMasuk })) if (!m.has(r.course_id) && urlGambarVideo(r.video_sumber, r.video_id)) m.set(r.course_id, r); } catch { /* tiada gambar automatik */ }
+  return m;
+}
+// gambar: thumbnail pilihan guru, atau laluan automatik /api/gambar/course/<id> (disemak di pelayar sebelum mengalih ke gambar video).
+const courseAwam = (c, guru, kategori, gambarAuto = false) => ({ gambar: urlGambar(c.thumbnail) || (gambarAuto ? `/api/gambar/course/${c.id}` : null), id: c.id, slug: c.slug, tajuk: c.tajuk, huraian: c.huraian ?? null, golongan: c.golongan || 'awam', guru: (c.guru_emel && guru?.get(c.guru_emel)) || null,
   kategori: (c.kategori_id && kategori?.get(c.kategori_id)) || null });
 // Kategori untuk paparan (F-12): id -> { id, nama, slug }. Jadual belum wujud: peta kosong.
 const petaKategori = async (repo) => { try { return new Map((await repo.senaraiKategori()).map((x) => [x.id, { id: x.id, nama: x.nama, slug: x.slug }])); } catch { return new Map(); } };
@@ -31,7 +40,7 @@ const petaKategori = async (repo) => { try { return new Map((await repo.senaraiK
 async function profilGuru(repo, emel) {
   if (!emel) return null;
   let g = null; try { g = await repo.guruDariEmel(emel); } catch { /* jadual belum wujud */ }
-  return g ? { nama: g.nama, kelayakan: g.kelayakan ?? null, institusi: g.institusi ?? null, bio: g.bio ?? null } : null;
+  return g ? { nama: g.nama, kelayakan: g.kelayakan ?? null, institusi: g.institusi ?? null, bio: g.bio ?? null, gambar: urlGambar(g.gambar) } : null;
 }
 // Nama guru untuk paparan. Jadual guru mungkin belum wujud: pulangkan peta kosong.
 const petaGuru = async (repo) => { try { return new Map((await repo.senaraiGuru()).map((g) => [g.emel, g.nama])); } catch { return new Map(); } };
@@ -50,6 +59,23 @@ export async function pelajarApi(req, env, url, repo, now) {
   const k = await konteks(req, env, repo, now);
   const logMasuk = !!k.pengguna;
 
+  // Gambar automatik daripada video (kuliah atau siri). Mengalih (302) ke gambar video HANYA jika pengguna ini layak menonton
+  // kuliah itu; selain itu 404. URL gambar YouTube/Drive mendedahkan ID video, jadi ia tidak pernah berada dalam senarai API.
+  if (bahagian[0] === 'gambar' && bahagian.length === 3 && ['subject', 'course'].includes(bahagian[1]) && req.method === 'GET') {
+    const id = idDari(bahagian[2]);
+    let video = null;
+    if (bahagian[1] === 'subject') {
+      const t = await subjectTerbit(repo, id);
+      if (t && keterlihatan(t.c.golongan, k.golongan) !== 'sembunyi' && keputusanSubject({ course: t.c, subject: t.s, logMasuk, golongan: k.golongan }).akses) video = t.s;
+    } else {
+      const c = id && await repo.courseDariId(id);
+      if (c && c.status === 'terbit' && keterlihatan(c.golongan, k.golongan) === 'nampak') video = (await videoGambarSiri(repo, logMasuk)).get(c.id) ?? null;
+    }
+    const sasaran = video && urlGambarVideo(video.video_sumber, video.video_id);
+    if (!sasaran) return json({ ralat: 'tidak-dijumpai' }, 404);
+    return new Response(null, { status: 302, headers: { location: sasaran, 'cache-control': 'private, max-age=3600', vary: 'Cookie', 'referrer-policy': 'no-referrer' } });
+  }
+
   // Senarai kategori awam (F-12): hanya kategori yang ada siri terbit yang boleh dilihat pengguna ini.
   if (bahagian[0] === 'kategori' && bahagian.length === 1 && req.method === 'GET') {
     const bil = new Map();
@@ -66,8 +92,9 @@ export async function pelajarApi(req, env, url, repo, now) {
     const kategori = await petaKategori(repo);
     const tapis = (url.searchParams.get('kategori') || '').trim().toLowerCase();
     const tapisId = tapis ? ([...kategori.values()].find((x) => x.slug === tapis)?.id ?? -1) : null; // slug tidak dikenali = tiada hasil
+    const auto = await videoGambarSiri(repo, logMasuk);
     const senarai = (await repo.senaraiCourse()).filter((c) => c.bil_subject_terbit > 0 && keterlihatan(c.golongan, k.golongan) !== 'sembunyi' && (tapisId === null || c.kategori_id === tapisId))
-      .map((c) => ({ ...courseAwam(c, guru, kategori), terkunci_golongan: keterlihatan(c.golongan, k.golongan) === 'berkunci', bil_subject: c.bil_subject_terbit, selesai: selesai ? (selesai.get(c.id) ?? 0) : null }));
+      .map((c) => ({ ...courseAwam(c, guru, kategori, keterlihatan(c.golongan, k.golongan) === 'berkunci' ? false : auto.has(c.id)), terkunci_golongan: keterlihatan(c.golongan, k.golongan) === 'berkunci', bil_subject: c.bil_subject_terbit, selesai: selesai ? (selesai.get(c.id) ?? 0) : null }));
     return json(senarai);
   }
 
@@ -80,7 +107,7 @@ export async function pelajarApi(req, env, url, repo, now) {
     const sijilOn = await ciriAktif(repo, 'sijil_aktif');
     let sijil = null;
     if (logMasuk && sijilOn) { try { const x = await repo.sijilPengguna(k.pengguna.id, c.id); if (x) sijil = { kod: x.kod }; } catch { /* jadual sijil belum wujud */ } }
-    return json({ course: courseAwam(c, await petaGuru(repo), await petaKategori(repo)), guru_profil: await profilGuru(repo, c.guru_emel), subject, log_masuk: logMasuk, sijil, ciri: { sijil: sijilOn } });
+    return json({ course: courseAwam(c, await petaGuru(repo), await petaKategori(repo), subject.some((s) => s.gambar && s.gambar.startsWith('/api/gambar/'))), guru_profil: await profilGuru(repo, c.guru_emel), subject, log_masuk: logMasuk, sijil, ciri: { sijil: sijilOn } });
   }
 
   // Dapatkan sijil: semua kuliah terbit dalam course mesti selesai. Nama boleh ditukar sekali sebelum dikeluarkan sahaja.

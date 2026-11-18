@@ -14,6 +14,22 @@ Repo ini mesti kekal **private**. Emel admin ada dalam `wrangler.toml`.
 4. Tandakan **Tonton tanpa log masuk** jika kuliah itu boleh ditonton orang awam.
 5. Pilih **Terbit** (admin) atau **Hantar untuk kelulusan admin** (guru).
 
+### Video: YouTube atau Google Drive
+
+Medan **Pautan video** menerima kedua-dua jenis, dan sumbernya dikesan sendiri:
+- **Google Drive**: di Drive, klik kanan fail video, **Share**, tetapkan **Anyone with the link** (Viewer), **Copy link** dan tampal. Contoh: `https://drive.google.com/file/d/<ID>/view`. Folder tak boleh digunakan.
+- **YouTube**: tampal pautan Share; video sebaiknya **Unlisted**.
+- Video **Google Drive tidak ditanda khatam secara automatik** (Drive tak menghantar isyarat video tamat). Pelajar menekan **Tandakan selesai** sendiri. Video YouTube ditanda khatam secara automatik.
+- Drive bukan platform video: video besar yang ditonton ramai boleh dikenakan had oleh Google (mesej "terlalu ramai pengguna"). Untuk trafik besar, YouTube lebih stabil.
+- Sesiapa yang ada pautan Drive atau YouTube boleh menontonnya terus. Sistem hanya menghantar ID video kepada pengguna yang layak.
+
+### Gambar thumbnail dan gambar guru
+
+- **Thumbnail siri** (borang Siri) dan **thumbnail kuliah** (borang Kuliah): tampal pautan fail gambar Google Drive (perkongsian **Anyone with the link**). Kosongkan untuk guna gambar automatik daripada video.
+- **Gambar guru**: tab **Pasukan**, butang **Profil**. Hanya admin boleh isi. Pastikan guru bersetuju.
+- Hanya pautan Google Drive diterima untuk gambar. Muat naik terus ke laman memerlukan storan R2 (belum diaktifkan).
+- Gambar automatik daripada video dipaparkan kepada pelawat hanya jika kuliah itu terbuka (pratonton).
+
 ## 2. Cara luluskan kandungan guru
 
 Tab **Kelulusan** menunjukkan siri, kuliah dan perubahan yang menunggu. Tekan **Lulus**, atau **Tolak** dengan catatan untuk guru.
@@ -39,6 +55,7 @@ Di **Tetapan laman**, dua pilihan **Papar** atau **Sembunyi**:
 ## 6. Perkara yang belum dibuat
 
 - **Storan R2 (nota PDF, logo, gambar artikel, sandaran harian)** belum didaftar. Ciri ni dimatikan. Sandaran manual: `wrangler d1 export` oleh pembangun, sebelum perubahan besar dan sekurang-kurangnya sebulan sekali.
+- **Dasar privasi** ada di `/privasi` (dihidang dari server, nama laman dan emel hubungan dari Tetapan laman). Isi **Emel hubungan** di Tetapan laman, dan semak teksnya sebelum lancar.
 - **Google OAuth** masih mod Testing. Pengguna biasa belum boleh log masuk sehingga ditukar ke Production (lihat bahagian 7).
 - Kandungan ujian dalam panel: **"Ujian: Pengenalan Aliran"** dan **"Kuliah 2"** masih ada. Padam bila dah tak perlu.
 

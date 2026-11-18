@@ -87,7 +87,7 @@ try {
     await page.fill('#video', 'https://youtube.com.penipu.test/watch?v=dQw4w9WgXcQ');
     await page.check('input[name=status][value=terbit]');
     await simpan();
-    await page.getByText('Pautan YouTube tidak dikenali').waitFor();
+    await page.getByText('Pautan video tidak dikenali').waitFor();
     assert.ok(await page.locator('#video').evaluate((e) => e.classList.contains('salah')));
     await page.fill('#video', 'https://youtu.be/abcdefghijk?si=kongsi');
     await simpan();
@@ -99,7 +99,7 @@ try {
     await page.fill('#tajuk', 'Bab 2: Lanjutan');
     await page.check('input[name=status][value=terbit]');
     await simpan();
-    await page.getByText('mesti ada video YouTube').waitFor();
+    await page.getByText('mesti ada video (YouTube atau Google Drive)').waitFor();
     await page.check('input[name=status][value=draf]');
     await simpan();
     await page.locator('.subject', { hasText: 'Bab 2: Lanjutan' }).waitFor();

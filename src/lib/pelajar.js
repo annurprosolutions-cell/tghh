@@ -7,6 +7,7 @@
 // tetapi perlu kod kelas) atau tersembunyi (pelajar tidak nampak course ahli).
 
 import { keterlihatan } from './golongan.js';
+import { urlGambar } from './media.js';
 
 export function keputusanSubject({ course, subject, logMasuk, golongan = 'awam' }) {
   if (course.status !== 'terbit' || subject.status !== 'terbit') return { akses: false, sebab: 'tidak-terbit' };
@@ -18,8 +19,12 @@ export function keputusanSubject({ course, subject, logMasuk, golongan = 'awam' 
 }
 
 // Untuk senarai: tiada video_id langsung, walaupun layak (pemain memuatkan butiran subject sendiri).
+// gambar: thumbnail pilihan guru (rujukan gambar, bukan ID video) atau, hanya jika layak menonton, gambar automatik video.
+// Gambar automatik dihidang melalui /api/gambar/subject/<id> yang menyemak kelayakan di pelayan; URL dalam senarai TIDAK
+// mengandungi ID video (URL YouTube/Drive langsung akan mendedahkannya).
 export const subjectRingkas = (s, k, selesai) => ({
   id: s.id, tajuk: s.tajuk, urutan: s.urutan, pratonton: !!s.pratonton, tempoh_saat: s.tempoh_saat ?? null,
+  gambar: urlGambar(s.thumbnail) || (k.akses && s.video_id ? `/api/gambar/subject/${s.id}` : null),
   boleh_tonton: k.akses, sebab: k.sebab, selesai: !!selesai,
 });
 
@@ -27,5 +32,5 @@ export const subjectPenuh = (s, k, selesai) => ({
   ...subjectRingkas(s, k, selesai),
   huraian: s.huraian ?? null,
   // video_id dan rujukan hanya untuk yang layak menonton (rujukan = bahan kuliah itu sendiri)
-  ...(k.akses ? { video_id: s.video_id, rujukan: s.rujukan ?? null } : {}),
+  ...(k.akses ? { video_id: s.video_id, video_sumber: s.video_sumber === 'drive' ? 'drive' : 'youtube', rujukan: s.rujukan ?? null } : {}),
 });

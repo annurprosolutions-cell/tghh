@@ -70,8 +70,9 @@ const RALAT = {
   'tajuk-tidak-sah': 'Tajuk wajib diisi, maksimum 120 aksara.',
   'huraian-tidak-sah': 'Huraian maksimum 2000 aksara.',
   'urutan-tidak-sah': 'Urutan mesti nombor bulat 0 hingga 9999.',
-  'video-tidak-sah': 'Pautan YouTube tidak dikenali. Tampal pautan video YouTube (contoh https://youtu.be/...).',
-  'video-diperlukan': 'Kuliah yang diterbitkan mesti ada video YouTube. Tampal pautan, atau simpan sebagai draf.',
+  'video-tidak-sah': 'Pautan video tidak dikenali. Tampal pautan YouTube (https://youtu.be/...) atau pautan fail Google Drive (https://drive.google.com/file/d/.../view). Folder Drive tidak boleh digunakan.',
+  'pautan-gambar-tidak-sah': 'Pautan gambar tidak sah. Guna pautan fail gambar Google Drive (https://drive.google.com/file/d/.../view) dan pastikan perkongsian ditetapkan kepada sesiapa yang ada pautan.',
+  'video-diperlukan': 'Kuliah yang diterbitkan mesti ada video (YouTube atau Google Drive). Tampal pautan, atau simpan sebagai draf.',
   'ada-subject': 'Siri ini masih ada kuliah. Padam semua kuliah dahulu.',
   'tidak-dibenarkan': 'Akaun ini bukan admin.',
   'belum-log-masuk': 'Sesi tamat. Sila log masuk semula.',
@@ -143,9 +144,19 @@ const pergi = (hash) => { if (location.hash === hash) laluan(); else location.ha
 const LABEL_GOLONGAN = { awam: 'Semua (orang awam)', pelajar: 'Pelajar dan ahli organisasi', ahli: 'Ahli organisasi sahaja' };
 const lencanaGolongan = (g) => (g && g !== 'awam' ? `<span class="lencana pratonton">${g === 'ahli' ? 'Ahli organisasi' : 'Pelajar'}</span>` : '');
 const lencanaStatus = (s) => (s === 'terbit' ? '<span class="lencana">Terbit</span>' : s === 'menunggu' ? '<span class="lencana pratonton">Menunggu kelulusan</span>' : '<span class="lencana draf">Draf</span>');
-const gambarVideo = (id) => (id
-  ? `<img src="https://i.ytimg.com/vi/${h(id)}/mqdefault.jpg" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tiada-video',textContent:'Video'}))">`
-  : '<div class="tiada-video">Tiada video</div>');
+// Pautan media (YouTube atau Google Drive) untuk borang dan pratonton. Rujukan gambar disimpan sebagai "drive:<ID>".
+const idRujukan = (ref) => /^drive:([A-Za-z0-9_-]{20,80})$/.exec(String(ref ?? ''))?.[1] || null;
+const urlThumbDrive = (id) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w400`;
+const pautanVideoP = (sumber, id) => (!id ? '' : sumber === 'drive' ? `https://drive.google.com/file/d/${id}/view` : `https://youtu.be/${id}`);
+const pautanGambarP = (ref) => (idRujukan(ref) ? `https://drive.google.com/file/d/${idRujukan(ref)}/view` : '');
+// Pratonton kecil: thumbnail pilihan, jika tiada gambar daripada video (YouTube atau Drive), jika gagal dimuatkan "Video".
+function gambarSubject(s) {
+  const id = idRujukan(s?.thumbnail);
+  const url = id ? urlThumbDrive(id) : !s?.video_id ? null : s.video_sumber === 'drive' ? urlThumbDrive(s.video_id) : `https://i.ytimg.com/vi/${encodeURIComponent(s.video_id)}/mqdefault.jpg`;
+  return url
+    ? `<img src="${h(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tiada-video',textContent:'Video'}))">`
+    : '<div class="tiada-video">Tiada video</div>';
+}
 
 function paparRalat(e) {
   if (e instanceof RalatApi && e.status === 401) return mula();
@@ -209,6 +220,9 @@ async function borangCourse(id) {
       <label for="kategori_id">Kategori</label>
       <select id="kategori_id" name="kategori_id"><option value="">Tiada kategori</option>${kat.map((k) => `<option value="${k.id}" ${Number(v.kategori_id) === k.id ? 'selected' : ''}>${h(k.nama)}</option>`).join('')}</select>
       <div class="bantuan">Satu siri satu kategori. Pelawat boleh menapis siri ikut kategori di laman utama.${ADMIN() ? '' : ' Menukar kategori siri yang sudah terbit perlu kelulusan admin.'}</div>
+      <label for="thumbnail">Gambar thumbnail siri (pilihan)</label>
+      <input type="url" id="thumbnail" name="thumbnail" inputmode="url" placeholder="https://drive.google.com/file/d/.../view" value="${h(pautanGambarP(v.thumbnail))}">
+      <div class="bantuan">Pautan gambar dari Google Drive (perkongsian <b>Anyone with the link</b>). Dipaparkan pada kad siri di laman utama. Kosongkan untuk guna gambar daripada kuliah pertama yang boleh ditonton secara automatik.</div>
       <label for="golongan">Siapa boleh lihat</label>
       <select id="golongan" name="golongan">${Object.entries(LABEL_GOLONGAN).map(([k, t]) => `<option value="${k}" ${(v.golongan || 'awam') === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <div class="bantuan">Orang awam nampak siri pelajar dan ahli organisasi dalam keadaan berkunci. Pelajar tidak nampak siri ahli organisasi langsung. Golongan diberi melalui kod di menu <b>Kod golongan</b>.</div>
@@ -247,7 +261,7 @@ async function butiranCourse(id) {
     <h2>Subject (${c.subject.length})</h2>
     ${c.subject.length ? c.subject.map((s, i) => `
       <div class="kad subject">
-        ${gambarVideo(s.video_id)}
+        ${gambarSubject(s)}
         <div class="isi">
           <b>${i + 1}. ${h(s.tajuk)}</b>
           <div class="baris">${lencanaStatus(s.status)} ${s.pratonton ? '<span class="lencana pratonton">Tanpa log masuk</span>' : ''}
@@ -275,10 +289,13 @@ async function borangSubject(cid, sid) {
       ${kotakCatatan(s0)}${kotakSemakan(s0)}
       <label for="tajuk">Tajuk</label>
       <input type="text" id="tajuk" name="tajuk" maxlength="120" value="${h(s.tajuk)}" required>
-      <label for="video">Pautan video YouTube</label>
-      <input type="url" id="video" name="video" inputmode="url" placeholder="https://youtu.be/..." value="${s.video_id ? `https://youtu.be/${h(s.video_id)}` : ''}">
-      <div class="bantuan">Tampal pautan dari butang Share di YouTube. Video sebaiknya <b>Unlisted</b>.</div>
-      ${s.video_id ? `<div class="subject" style="margin-top:8px">${gambarVideo(s.video_id)}<span class="kecil">Video ${s0.semakan && 'video_id' in s0.semakan ? 'dicadangkan' : 'semasa'}</span></div>` : ''}
+      <label for="video">Pautan video (YouTube atau Google Drive)</label>
+      <input type="url" id="video" name="video" inputmode="url" placeholder="https://drive.google.com/file/d/.../view atau https://youtu.be/..." value="${h(pautanVideoP(s.video_sumber, s.video_id))}">
+      <div class="bantuan"><b>Google Drive:</b> klik kanan fail, <b>Share</b>, tetapkan <b>Anyone with the link</b> (Viewer), kemudian <b>Copy link</b> dan tampal di sini. <b>YouTube:</b> tampal pautan dari butang Share; video sebaiknya <b>Unlisted</b>. Video Google Drive tidak ditanda khatam secara automatik; pelajar menekan <b>Tandakan selesai</b> sendiri.</div>
+      ${s.video_id ? `<div class="subject" style="margin-top:8px">${gambarSubject(s)}<span class="kecil">Video ${s0.semakan && 'video_id' in s0.semakan ? 'dicadangkan' : 'semasa'} (${s.video_sumber === 'drive' ? 'Google Drive' : 'YouTube'})</span></div>` : ''}
+      <label for="thumbnail">Gambar thumbnail (pilihan)</label>
+      <input type="url" id="thumbnail" name="thumbnail" inputmode="url" placeholder="https://drive.google.com/file/d/.../view" value="${h(pautanGambarP(s.thumbnail))}">
+      <div class="bantuan">Pautan fail gambar (JPG atau PNG) dari Google Drive, perkongsian <b>Anyone with the link</b>. Kosongkan untuk guna gambar daripada video secara automatik. Disyorkan nisbah 16:9.</div>
       <label for="huraian">Huraian</label>
       <textarea id="huraian" name="huraian" maxlength="2000">${h(s.huraian)}</textarea>
       <label for="rujukan">Rujukan dan dalil</label>
@@ -299,9 +316,11 @@ async function borangSubject(cid, sid) {
 
 // ---------- kelulusan (admin) ----------
 
-const NAMA_MEDAN = { tajuk: 'Tajuk', huraian: 'Huraian', video_id: 'Video', pratonton: 'Tanpa log masuk', golongan: 'Siapa boleh lihat', tempoh_saat: 'Tempoh' };
-function nilaiMedan(k, v) {
-  if (k === 'video_id') return v ? `<a href="https://youtu.be/${h(v)}" target="_blank" rel="noopener">youtu.be/${h(v)}</a>` : '(tiada)';
+const NAMA_MEDAN = { tajuk: 'Tajuk', huraian: 'Huraian', video_id: 'Video', video_sumber: 'Sumber video', thumbnail: 'Gambar thumbnail', pratonton: 'Tanpa log masuk', golongan: 'Siapa boleh lihat', tempoh_saat: 'Tempoh', rujukan: 'Rujukan', kategori_id: 'Kategori' };
+function nilaiMedan(k, v, sumber) {
+  if (k === 'video_id') return v ? `<a href="${h(pautanVideoP(sumber, v))}" target="_blank" rel="noopener">${sumber === 'drive' ? 'Google Drive' : 'youtu.be/' + h(v)}</a>` : '(tiada)';
+  if (k === 'video_sumber') return sumber === 'drive' ? 'Google Drive' : 'YouTube';
+  if (k === 'thumbnail') return pautanGambarP(v) ? `<a href="${h(pautanGambarP(v))}" target="_blank" rel="noopener">Gambar (Google Drive)</a>` : '(tiada)';
   if (k === 'pratonton') return v ? 'Ya' : 'Tidak';
   const t = String(v ?? '');
   return t ? h(t.length > 400 ? t.slice(0, 400) + '…' : t) : '<i>(kosong)</i>';
@@ -319,13 +338,13 @@ async function halamanKelulusan() {
     <p class="kecil">Kandungan daripada guru hanya dipaparkan kepada pelajar selepas diluluskan. Tolak akan meminta catatan yang dilihat guru.</p>
     ${bahagian('Siri baru', q.course, (c) => `<div class="kad"><b>${h(c.tajuk)}</b>
       <div class="kecil">Guru: ${h(c.guru_nama || '-')} · <a href="#/course/${c.id}">Lihat siri</a></div>${c.huraian ? `<p>${h(c.huraian)}</p>` : ''}${butangKelulusan('course', c.id)}</div>`)}
-    ${bahagian('Kuliah baru', q.subject, (s) => `<div class="kad subject">${gambarVideo(s.video_id)}<div class="isi"><b>${h(s.tajuk)}</b>
-      <div class="kecil">${h(s.course_tajuk)} · Guru: ${h(s.guru_nama || '-')} · <a href="#/course/${s.course_id}/subject/${s.id}">Lihat</a>${s.video_id ? ` · <a href="https://youtu.be/${h(s.video_id)}" target="_blank" rel="noopener">Tonton</a>` : ''}</div>
+    ${bahagian('Kuliah baru', q.subject, (s) => `<div class="kad subject">${gambarSubject(s)}<div class="isi"><b>${h(s.tajuk)}</b>
+      <div class="kecil">${h(s.course_tajuk)} · Guru: ${h(s.guru_nama || '-')} · <a href="#/course/${s.course_id}/subject/${s.id}">Lihat</a>${s.video_id ? ` · <a href="${h(pautanVideoP(s.video_sumber, s.video_id))}" target="_blank" rel="noopener">Tonton</a>` : ''}</div>
       ${butangKelulusan('subject', s.id)}</div></div>`)}
     ${bahagian('Perubahan pada kandungan terbit', q.perubahan, (k) => `<div class="kad"><b>${k.jenis === 'course' ? 'Course' : 'Kuliah'}: ${h(k.tajuk)}</b>
       <div class="kecil">Guru: ${h(k.guru_nama || '-')}</div>
       <table class="beza"><thead><tr><th>Medan</th><th>Sekarang</th><th>Dicadangkan</th></tr></thead><tbody>
-      ${Object.keys(k.perubahan).map((m) => `<tr><td>${NAMA_MEDAN[m] || h(m)}</td><td>${nilaiMedan(m, k.semasa[m])}</td><td>${nilaiMedan(m, k.perubahan[m])}</td></tr>`).join('')}
+      ${Object.keys(k.perubahan).map((m) => `<tr><td>${NAMA_MEDAN[m] || h(m)}</td><td>${nilaiMedan(m, k.semasa[m], k.semasa.video_sumber ?? k.perubahan.video_sumber)}</td><td>${nilaiMedan(m, k.perubahan[m], k.perubahan.video_sumber ?? k.semasa.video_sumber)}</td></tr>`).join('')}
       </tbody></table>${butangKelulusan('perubahan', k.id)}</div>`)}
     ${bahagian('Nota PDF', q.nota, (n) => `<div class="kad"><b>${h(n.nama)}</b> <span class="kecil">${saizTeks(n.saiz)}</span>
       <div class="kecil">${h(n.course_tajuk)} · ${h(n.subject_tajuk)} · Guru: ${h(n.guru_nama || '-')} · <a href="/api/admin/nota/${n.id}" target="_blank" rel="noopener">Buka PDF</a></div>${butangKelulusan('nota', n.id)}</div>`)}`;
@@ -454,6 +473,9 @@ async function halamanGuru() {
         <input type="text" name="kelayakan" maxlength="200" value="${h(g.kelayakan)}" placeholder="contoh: Sarjana Usuluddin; Tauliah mengajar JAIS">
         <label>Institusi</label>
         <input type="text" name="institusi" maxlength="120" value="${h(g.institusi)}">
+        <label>Gambar guru (pilihan)</label>
+        <input type="url" name="gambar" inputmode="url" placeholder="https://drive.google.com/file/d/.../view" value="${h(pautanGambarP(g.gambar))}">
+        <div class="bantuan">Pautan gambar dari Google Drive (perkongsian <b>Anyone with the link</b>). Dipaparkan kecil pada kad Pengajar. Pastikan guru bersetuju gambarnya dipaparkan.</div>
         <label>Bio ringkas</label>
         <textarea name="bio" maxlength="600" rows="4">${h(g.bio)}</textarea>
         <div class="bantuan">Dipaparkan kepada orang awam pada halaman siri guru ini. Hanya admin boleh mengisi atau mengubahnya; guru tidak boleh menyunting sendiri. Pastikan kelayakan dan tauliah telah disahkan.</div>
@@ -843,7 +865,7 @@ const BORANG = {
   async course(b) {
     const d = new FormData(b);
     const urutan = String(d.get('urutan') ?? '').trim();
-    const badan = { tajuk: d.get('tajuk'), huraian: d.get('huraian'), golongan: d.get('golongan') || 'awam', kategori_id: d.get('kategori_id') ? Number(d.get('kategori_id')) : null };
+    const badan = { tajuk: d.get('tajuk'), huraian: d.get('huraian'), golongan: d.get('golongan') || 'awam', kategori_id: d.get('kategori_id') ? Number(d.get('kategori_id')) : null, thumbnail: d.get('thumbnail') };
     if (d.get('status')) badan.status = d.get('status'); // guru: tiada pilihan status bila course sudah terbit
     if (ADMIN()) { badan.urutan = urutan === '' ? null : Number(urutan); badan.guru_emel = d.get('guru_emel') || ''; }
     const id = b.dataset.id;
@@ -899,7 +921,7 @@ const BORANG = {
   },
   async 'profil-guru'(b) {
     const d = new FormData(b);
-    await api('PUT', `guru/${encodeURIComponent(b.dataset.emel)}`, { nama: d.get('nama'), kelayakan: d.get('kelayakan'), institusi: d.get('institusi'), bio: d.get('bio') });
+    await api('PUT', `guru/${encodeURIComponent(b.dataset.emel)}`, { nama: d.get('nama'), kelayakan: d.get('kelayakan'), institusi: d.get('institusi'), bio: d.get('bio'), gambar: d.get('gambar') });
     await halamanGuru();
     const f = document.querySelector(`[data-borang="profil-guru"][data-emel="${CSS.escape(b.dataset.emel)}"]`);
     if (f) { f.hidden = false; f.querySelector('.info').hidden = false; f.scrollIntoView({ block: 'center' }); }
@@ -927,7 +949,7 @@ const BORANG = {
   },
   async subject(b) {
     const d = new FormData(b);
-    const badan = { tajuk: d.get('tajuk'), huraian: d.get('huraian'), rujukan: d.get('rujukan'), video: d.get('video'), pratonton: d.get('pratonton') === 'on' };
+    const badan = { tajuk: d.get('tajuk'), huraian: d.get('huraian'), rujukan: d.get('rujukan'), video: d.get('video'), thumbnail: d.get('thumbnail'), pratonton: d.get('pratonton') === 'on' };
     if (d.get('status')) badan.status = d.get('status');
     const { course, id } = b.dataset;
     if (id) await api('PUT', `subject/${id}`, badan); else await api('POST', `course/${course}/subject`, badan);

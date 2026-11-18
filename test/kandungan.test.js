@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ekstrakIdYoutube, buatSlug, sahkanCourse, sahkanSubject } from '../src/lib/kandungan.js';
+import { ekstrakIdYoutube, buatSlug, sahkanCourse, sahkanSubject, sahkanProfilGuru } from '../src/lib/kandungan.js';
 
 const ID = 'dQw4w9WgXcQ';
 
@@ -56,7 +56,7 @@ test('sahkanCourse: kemas kini separa hanya mengesahkan medan yang diberi', () =
 
 test('sahkanSubject: pautan YouTube jadi ID, pratonton mesti boolean sebenar', () => {
   const r = sahkanSubject({ tajuk: 'Intro', video: `https://youtu.be/${ID}`, pratonton: true });
-  assert.deepEqual(r.nilai, { tajuk: 'Intro', video_id: ID, pratonton: 1, status: 'draf' });
+  assert.deepEqual(r.nilai, { tajuk: 'Intro', video_id: ID, video_sumber: 'youtube', pratonton: 1, status: 'draf' });
   assert.equal(sahkanSubject({ tajuk: 'A', pratonton: 'ya' }).medan, 'pratonton');
   assert.equal(sahkanSubject({ tajuk: 'A', pratonton: 1 }).medan, 'pratonton');
   assert.equal(sahkanSubject({ tajuk: 'A', video: 'https://evil.test/x' }).medan, 'video');
@@ -68,7 +68,35 @@ test('sahkanSubject: tempoh, status, kosongkan video, kemas kini separa', () => 
   assert.equal(sahkanSubject({ tajuk: 'A', tempoh_saat: 90000 }).medan, 'tempoh_saat');
   assert.equal(sahkanSubject({ tajuk: 'A', tempoh_saat: 600 }).nilai.tempoh_saat, 600);
   assert.equal(sahkanSubject({ tajuk: 'A', status: 'x' }).medan, 'status');
-  assert.deepEqual(sahkanSubject({ video: '' }, { separa: true }).nilai, { video_id: null });
+  assert.deepEqual(sahkanSubject({ video: '' }, { separa: true }).nilai, { video_id: null, video_sumber: 'youtube' });
   assert.deepEqual(sahkanSubject({ pratonton: false }, { separa: true }).nilai, { pratonton: 0 });
   assert.deepEqual(sahkanSubject({}, { separa: true }).nilai, {});
+});
+
+const DRIVE = '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO';
+test('sahkanSubject: pautan Google Drive diterima dan sumbernya direkod; YouTube didahulukan; folder dan hos palsu ditolak', () => {
+  const d = sahkanSubject({ tajuk: 'Drive', video: `https://drive.google.com/file/d/${DRIVE}/view?usp=drive_link` });
+  assert.equal(d.ok, true);
+  assert.deepEqual([d.nilai.video_id, d.nilai.video_sumber], [DRIVE, 'drive']);
+  assert.deepEqual([sahkanSubject({ tajuk: 'A', video: DRIVE }).nilai.video_id, sahkanSubject({ tajuk: 'A', video: DRIVE }).nilai.video_sumber], [DRIVE, 'drive']); // ID Drive sahaja
+  assert.equal(sahkanSubject({ tajuk: 'A', video: ID }).nilai.video_sumber, 'youtube');
+  assert.equal(sahkanSubject({ tajuk: 'A', video: `https://drive.google.com/drive/folders/${DRIVE}` }).medan, 'video');
+  assert.equal(sahkanSubject({ tajuk: 'A', video: `https://drive.google.com.penipu.test/file/d/${DRIVE}/view` }).medan, 'video');
+  // menukar daripada Drive ke YouTube menukar sumber sekali
+  assert.deepEqual(sahkanSubject({ video: `https://youtu.be/${ID}` }, { separa: true }).nilai, { video_id: ID, video_sumber: 'youtube' });
+});
+
+test('thumbnail dan gambar guru: hanya pautan Google Drive; kosong = buang; URL luar dan skrip ditolak', () => {
+  const tn = (f, m, o) => f(m, o);
+  assert.equal(sahkanCourse({ tajuk: 'A', thumbnail: `https://drive.google.com/file/d/${DRIVE}/view` }).nilai.thumbnail, `drive:${DRIVE}`);
+  assert.equal(sahkanCourse({ tajuk: 'A', thumbnail: '' }).nilai.thumbnail, null);
+  assert.equal(sahkanCourse({ tajuk: 'A', thumbnail: 'https://contoh.my/gambar.jpg' }).medan, 'thumbnail');
+  assert.equal(sahkanCourse({ tajuk: 'A', thumbnail: 5 }).medan, 'thumbnail');
+  assert.equal('thumbnail' in sahkanCourse({ tajuk: 'A' }).nilai, false);
+  assert.equal(tn(sahkanSubject, { tajuk: 'A', thumbnail: DRIVE }).nilai.thumbnail, `drive:${DRIVE}`);
+  assert.equal(tn(sahkanSubject, { tajuk: 'A', thumbnail: '<img src=x onerror=alert(1)>' }).medan, 'thumbnail');
+  assert.equal(sahkanSubject({ thumbnail: null }, { separa: true }).nilai.thumbnail, null);
+  assert.equal(sahkanProfilGuru({ gambar: `https://drive.google.com/open?id=${DRIVE}` }).nilai.gambar, `drive:${DRIVE}`);
+  assert.equal(sahkanProfilGuru({ gambar: 'https://contoh.my/muka.jpg' }).medan, 'gambar');
+  assert.equal(sahkanProfilGuru({ gambar: '' }).nilai.gambar, null);
 });

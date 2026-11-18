@@ -74,13 +74,13 @@ export function repoPalsu() {
     async ciptaCourse(c, masa) {
       const golongan = c.golongan || 'awam';
       const urutan = c.urutan ?? Math.max(0, ...[...courses.values()].map((x) => x.urutan)) + 1;
-      const baris = { id: idC++, tajuk: c.tajuk, slug: c.slug, huraian: c.huraian ?? null, status: c.status, urutan, guru_emel: c.guru_emel ?? null, catatan_semakan: null, golongan, kategori_id: c.kategori_id ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
+      const baris = { id: idC++, tajuk: c.tajuk, slug: c.slug, huraian: c.huraian ?? null, status: c.status, urutan, guru_emel: c.guru_emel ?? null, catatan_semakan: null, golongan, kategori_id: c.kategori_id ?? null, thumbnail: c.thumbnail ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
       courses.set(baris.id, baris);
       return baris;
     },
     async kemaskiniCourse(id, nilai, masa) {
       const c = courses.get(id);
-      for (const k of ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan', 'kategori_id']) if (k in nilai) c[k] = nilai[k];
+      for (const k of ['tajuk', 'huraian', 'status', 'urutan', 'guru_emel', 'catatan_semakan', 'golongan', 'kategori_id', 'thumbnail']) if (k in nilai) c[k] = nilai[k];
       c.dikemas_kini_pada = masa;
       return c;
     },
@@ -93,13 +93,13 @@ export function repoPalsu() {
     async ciptaSubject(courseId, v, masa) {
       const urutan = v.urutan ?? Math.max(0, ...[...subjects.values()].filter((s) => s.course_id === courseId).map((s) => s.urutan)) + 1;
       const baris = { id: idS++, course_id: courseId, tajuk: v.tajuk, huraian: v.huraian ?? null, urutan, pratonton: v.pratonton ?? 0, status: v.status ?? 'draf',
-        video_sumber: 'youtube', video_id: v.video_id ?? null, tempoh_saat: v.tempoh_saat ?? null, rujukan: v.rujukan ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
+        video_sumber: v.video_sumber ?? 'youtube', video_id: v.video_id ?? null, tempoh_saat: v.tempoh_saat ?? null, rujukan: v.rujukan ?? null, thumbnail: v.thumbnail ?? null, dicipta_pada: masa, dikemas_kini_pada: masa };
       subjects.set(baris.id, baris);
       return baris;
     },
     async kemaskiniSubject(id, nilai, masa) {
       const s = subjects.get(id);
-      for (const k of ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan', 'rujukan']) if (k in nilai) s[k] = nilai[k];
+      for (const k of ['tajuk', 'huraian', 'urutan', 'pratonton', 'status', 'video_id', 'tempoh_saat', 'catatan_semakan', 'rujukan', 'video_sumber', 'thumbnail']) if (k in nilai) s[k] = nilai[k];
       s.dikemas_kini_pada = masa;
       return s;
     },
@@ -196,6 +196,10 @@ export function repoPalsu() {
     },
     async bilLaporanBaharu() { return [...laporanM.values()].filter((l) => l.status === 'baru').length; },
     async kemaskiniLaporan(id, nilai, masa) { const l = laporanM.get(id); for (const k of ['status', 'catatan_admin']) if (k in nilai) l[k] = nilai[k]; l.dikemas_kini_pada = masa; return l; },
+    async videoUntukGambarSiri({ hanyaPratonton = false } = {}) {
+      return [...subjects.values()].filter((s) => s.status === 'terbit' && courses.get(s.course_id)?.status === 'terbit' && s.video_id && (!hanyaPratonton || s.pratonton))
+        .sort((a, b) => a.course_id - b.course_id || a.urutan - b.urutan || a.id - b.id).map((s) => ({ course_id: s.course_id, video_sumber: s.video_sumber, video_id: s.video_id }));
+    },
     async senaraiKategori() {
       return [...kategoriM.values()].sort((a, b) => a.urutan - b.urutan || a.id - b.id).map((k) => { const cs = [...courses.values()].filter((c) => c.kategori_id === k.id);
         return { ...k, bil_course: cs.length, bil_course_terbit: cs.filter((c) => c.status === 'terbit').length }; });
@@ -212,12 +216,12 @@ export function repoPalsu() {
     async padamKategori(id) { kategoriM.delete(id); },
     async senaraiGuru() { return [...gurus.values()].map((g) => ({ ...g, bil_course: [...courses.values()].filter((c) => c.guru_emel === g.emel).length })).sort((a, b) => a.nama.localeCompare(b.nama)); },
     async guruDariEmel(e) { return gurus.get(e) ?? null; },
-    async simpanGuru(emel, nama, masa) { const ada = gurus.get(emel); gurus.set(emel, { kelayakan: null, institusi: null, bio: null, ...ada, emel, nama, dicipta_pada: ada?.dicipta_pada ?? masa }); },
-    async kemaskiniProfilGuru(emel, p) { const g = gurus.get(emel); Object.assign(g, { kelayakan: p.kelayakan ?? null, institusi: p.institusi ?? null, bio: p.bio ?? null }); return g; },
+    async simpanGuru(emel, nama, masa) { const ada = gurus.get(emel); gurus.set(emel, { kelayakan: null, institusi: null, bio: null, gambar: null, ...ada, emel, nama, dicipta_pada: ada?.dicipta_pada ?? masa }); },
+    async kemaskiniProfilGuru(emel, p) { const g = gurus.get(emel); Object.assign(g, { kelayakan: p.kelayakan ?? null, institusi: p.institusi ?? null, bio: p.bio ?? null, gambar: p.gambar ?? null }); return g; },
     async padamGuru(emel) { gurus.delete(emel); },
     async subjectMenunggu() {
       return [...subjects.values()].filter((s) => s.status === 'menunggu').map((s) => { const c = courses.get(s.course_id);
-        return { id: s.id, tajuk: s.tajuk, video_id: s.video_id, course_id: c.id, course_tajuk: c.tajuk, guru_emel: c.guru_emel ?? null }; });
+        return { id: s.id, tajuk: s.tajuk, video_id: s.video_id, video_sumber: s.video_sumber, thumbnail: s.thumbnail ?? null, course_id: c.id, course_tajuk: c.tajuk, guru_emel: c.guru_emel ?? null }; });
     },
     async kiraKhatam(cid) {
       const m = new Map();

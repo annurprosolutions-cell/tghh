@@ -392,7 +392,7 @@ test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai,
     _setSemula();
     await pastikanSkema(d);
     assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
-    assert.equal(LANGKAH.length, 2);
+    assert.equal(LANGKAH.length, 3);
     const r = repoD1(d);
     const c = await r.courseDariSlug('siri-lama');
     assert.deepEqual([c.tajuk, c.status, c.kategori_id], ['Siri Lama', 'terbit', null]);
@@ -407,7 +407,7 @@ test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai,
     await Promise.all([(_setSemula(), pastikanSkema(d)), pastikanSkema(d)]);
     assert.equal((await r.senaraiKategori()).length, 5);
     assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM course').first()).c, 1);
-    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '2');
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '3');
   } finally { await p2.dispose(); }
 });
 
@@ -445,4 +445,69 @@ test('laporan: cipta, had harian, pendua, senarai bersama kuliah dan pelapor, ke
 
 test('laporan: kunci asing menghalang laporan untuk kuliah atau pengguna yang tidak wujud', async () => {
   await assert.rejects(repo.ciptaLaporan({ subject_id: 987654, pengguna_id: 1, sebab: 'lain' }, 't'));
+});
+
+// ---------- Fasa 6: skema versi 3 (thumbnail, gambar guru, video Google Drive) ----------
+
+test('versi 3: lajur thumbnail dan gambar wujud; subjek, siri dan guru menyimpan video_sumber, thumbnail dan gambar', async () => {
+  const lajur = async (j) => (await db.prepare(`PRAGMA table_info(${j})`).all()).results.map((r) => r.name);
+  assert.ok((await lajur('course')).includes('thumbnail'));
+  assert.ok((await lajur('subject')).includes('thumbnail'));
+  assert.ok((await lajur('guru')).includes('gambar'));
+  const c = await repo.ciptaCourse({ tajuk: 'Siri Gambar', slug: await repo.slugUnik('siri-gambar'), status: 'terbit', thumbnail: 'drive:1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654' }, 't');
+  assert.equal(c.thumbnail, 'drive:1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654');
+  const yt = await repo.ciptaSubject(c.id, { tajuk: 'YT', video_id: 'dQw4w9WgXcQ', status: 'terbit', pratonton: 1 }, 't');
+  const dr = await repo.ciptaSubject(c.id, { tajuk: 'Drive', video_id: '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO', video_sumber: 'drive', thumbnail: 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345', status: 'terbit' }, 't');
+  assert.deepEqual([yt.video_sumber, yt.thumbnail], ['youtube', null]); // lalai kekal youtube
+  assert.deepEqual([dr.video_sumber, dr.thumbnail], ['drive', 'drive:1AbCdEfGhIjKlMnOpQrStUvWxYz012345']);
+  const k = await repo.kemaskiniSubject(yt.id, { video_id: '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO', video_sumber: 'drive', thumbnail: null }, 't2');
+  assert.deepEqual([k.video_id, k.video_sumber], ['1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO', 'drive']);
+  assert.equal((await repo.kemaskiniCourse(c.id, { thumbnail: null }, 't')).thumbnail, null);
+  await repo.simpanGuru('gambar@gmail.com', 'Ustaz G', 't');
+  await repo.kemaskiniProfilGuru('gambar@gmail.com', { kelayakan: 'K', institusi: null, bio: null, gambar: 'drive:1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654' });
+  await repo.simpanGuru('gambar@gmail.com', 'Ustaz G2', 't2'); // tukar nama sahaja
+  const g = await repo.guruDariEmel('gambar@gmail.com');
+  assert.deepEqual([g.nama, g.kelayakan, g.gambar], ['Ustaz G2', 'K', 'drive:1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654']);
+  assert.equal((await repo.senaraiGuru()).find((x) => x.emel === 'gambar@gmail.com').gambar, 'drive:1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654');
+});
+
+test('videoUntukGambarSiri: kuliah terbit sahaja dalam siri terbit, tertib urutan; pelawat hanya pratonton', async () => {
+  const c = await repo.ciptaCourse({ tajuk: 'Siri Auto', slug: await repo.slugUnik('siri-auto'), status: 'terbit' }, 't');
+  const draf = await repo.ciptaCourse({ tajuk: 'Siri Auto Draf', slug: await repo.slugUnik('siri-auto-draf'), status: 'draf' }, 't');
+  const a = await repo.ciptaSubject(c.id, { tajuk: 'A', video_id: 'aaaaaaaaaaa', status: 'terbit', pratonton: 0, urutan: 1 }, 't');
+  const b = await repo.ciptaSubject(c.id, { tajuk: 'B', video_id: 'bbbbbbbbbbb', status: 'terbit', pratonton: 1, urutan: 2 }, 't');
+  await repo.ciptaSubject(c.id, { tajuk: 'C draf', video_id: 'ccccccccccc', status: 'draf', pratonton: 1, urutan: 3 }, 't');
+  await repo.ciptaSubject(draf.id, { tajuk: 'D', video_id: 'ddddddddddd', status: 'terbit', pratonton: 1 }, 't');
+  const semua = (await repo.videoUntukGambarSiri()).filter((r) => r.course_id === c.id);
+  assert.deepEqual(semua.map((r) => r.video_id), ['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+  const pelawat = (await repo.videoUntukGambarSiri({ hanyaPratonton: true })).filter((r) => r.course_id === c.id);
+  assert.deepEqual(pelawat.map((r) => r.video_id), ['bbbbbbbbbbb']);
+  assert.equal((await repo.videoUntukGambarSiri()).some((r) => r.course_id === draf.id), false);
+  assert.ok(a && b);
+});
+
+test('naik taraf v2 ke v3: data lama kekal, video lama jadi youtube, lajur baharu NULL, tiada ralat bila dijalankan berulang', async () => {
+  const p3 = await getPlatformProxy({ configPath: 'wrangler.uji.toml', persist: false });
+  try {
+    const d = p3.env.DB;
+    await d.batch([...LANGKAH[0].map((s) => d.prepare(s)), ...LANGKAH[1].map((s) => d.prepare(s)), d.prepare(`INSERT INTO tetapan (kunci, nilai) VALUES ('skema_versi', '2')`)]);
+    await d.batch([
+      d.prepare(`INSERT INTO course (tajuk, slug, status, urutan, golongan, dicipta_pada, dikemas_kini_pada) VALUES ('Siri V2', 'siri-v2', 'terbit', 1, 'awam', 't', 't')`),
+      d.prepare(`INSERT INTO subject (course_id, tajuk, urutan, pratonton, status, video_sumber, video_id, rujukan, dicipta_pada, dikemas_kini_pada) VALUES (1, 'K V2', 1, 1, 'terbit', 'youtube', 'aaaaaaaaaaa', 'Rujukan lama', 't', 't')`),
+      d.prepare(`INSERT INTO guru (emel, nama, kelayakan, dicipta_pada) VALUES ('g@v2.com', 'Guru V2', 'Sarjana', 't')`),
+    ]);
+    _setSemula();
+    await pastikanSkema(d);
+    const r = repoD1(d);
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
+    const c = await r.courseDariSlug('siri-v2');
+    assert.deepEqual([c.tajuk, c.thumbnail], ['Siri V2', null]);
+    const s = (await r.senaraiSubject(c.id))[0];
+    assert.deepEqual([s.tajuk, s.video_id, s.video_sumber, s.rujukan, s.thumbnail], ['K V2', 'aaaaaaaaaaa', 'youtube', 'Rujukan lama', null]);
+    const g = await r.guruDariEmel('g@v2.com');
+    assert.deepEqual([g.nama, g.kelayakan, g.gambar], ['Guru V2', 'Sarjana', null]);
+    for (let i = 0; i < 3; i++) { _setSemula(); await pastikanSkema(d); }
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '3');
+    assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM subject').first()).c, 1);
+  } finally { await p3.dispose(); }
 });

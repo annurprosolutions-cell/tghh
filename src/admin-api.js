@@ -20,7 +20,7 @@ const MAKS_BADAN = 50_000;
 const MAKS_MEDIA = 2 * 1024 * 1024; // selepas dikecilkan di pelayar, gambar biasanya < 300 KB
 const EMEL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 // Medan yang perubahannya pada kandungan terbit memerlukan kelulusan (urutan subject dikecualikan: susunan sahaja).
-const MEDAN_SEMAK = { course: ['tajuk', 'huraian', 'golongan', 'kategori_id'], subject: ['tajuk', 'huraian', 'video_id', 'pratonton', 'tempoh_saat', 'rujukan'] };
+const MEDAN_SEMAK = { course: ['tajuk', 'huraian', 'golongan', 'kategori_id', 'thumbnail'], subject: ['tajuk', 'huraian', 'video_id', 'video_sumber', 'pratonton', 'tempoh_saat', 'rujukan', 'thumbnail'] };
 
 const luarSubject = (s) => ({ ...s, pratonton: !!s.pratonton });
 

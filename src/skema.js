@@ -85,6 +85,12 @@ export const LANGKAH = [
       ('Ideologi & Pemikiran Moden', 'ideologi-moden', 4, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       ('Gerakan Islam Semasa', 'gerakan-semasa', 5, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
   ],
+  // ---- versi 3: thumbnail siri dan kuliah, gambar guru (rujukan "drive:<ID>"), video Google Drive guna lajur video_sumber sedia ada ----
+  [
+    `ALTER TABLE course ADD COLUMN thumbnail TEXT`,
+    `ALTER TABLE subject ADD COLUMN thumbnail TEXT`,
+    `ALTER TABLE guru ADD COLUMN gambar TEXT`,
+  ],
 ];
 
 let sedia = false; // sekali bagi setiap isolate Worker

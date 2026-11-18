@@ -1,5 +1,7 @@
 // Pengesahan kandungan (course dan subject) dan utiliti. Fungsi tulen, tiada I/O.
 
+import { ekstrakIdDrive, ekstrakRujukanGambar } from './media.js';
+
 const ID_YT = /^[A-Za-z0-9_-]{11}$/;
 const HOS_YT = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
 export const STATUS = ['draf', 'menunggu', 'terbit'];
@@ -28,6 +30,16 @@ export function buatSlug(tajuk) {
   const s = String(tajuk ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60).replace(/-+$/g, '');
   return s || 'course';
+}
+
+// Medan gambar (thumbnail siri/kuliah, gambar guru): pautan Google Drive atau kosong. Disimpan sebagai "drive:<ID>".
+function medanGambar(m, n, kunci) {
+  if (!ada(m, kunci)) return null;
+  if (m[kunci] == null || m[kunci] === '') { n[kunci] = null; return null; }
+  const ref = typeof m[kunci] === 'string' ? ekstrakRujukanGambar(m[kunci]) : null;
+  if (!ref) return gagal('pautan-gambar-tidak-sah', kunci);
+  n[kunci] = ref;
+  return null;
 }
 
 const gagal = (sebab, medan) => ({ ok: false, sebab, ...(medan ? { medan } : {}) });
@@ -91,6 +103,7 @@ export function sahkanProfilGuru(m) {
     if (t.length > maks) return gagal('terlalu-panjang', k);
     n[k] = t || null;
   }
+  const gg = medanGambar(m, n, 'gambar'); if (gg) return gg;
   return { ok: true, nilai: n };
 }
 
@@ -109,6 +122,7 @@ export function sahkanCourse(m, { separa = false } = {}) {
     else if (!intDalam(m.kategori_id, 1, 1e9)) return gagal('kategori-tidak-sah', 'kategori_id');
     else n.kategori_id = m.kategori_id;
   }
+  const gc = medanGambar(m, n, 'thumbnail'); if (gc) return gc;
   return { ok: true, nilai: n };
 }
 
@@ -117,10 +131,17 @@ export function sahkanSubject(m, { separa = false } = {}) {
   const n = {};
   const g = tajukHuraian(m, separa, n) || urutanUntuk(m, n);
   if (g) return g;
+  // Video: pautan YouTube atau Google Drive. Sumber dikesan daripada pautan dan disimpan bersama ID.
   if (ada(m, 'video')) {
-    if (m.video == null || m.video === '') n.video_id = null;
-    else { const id = ekstrakIdYoutube(m.video); if (!id) return gagal('video-tidak-sah', 'video'); n.video_id = id; }
-  } else if (!separa) n.video_id = null;
+    if (m.video == null || m.video === '') { n.video_id = null; n.video_sumber = 'youtube'; }
+    else {
+      const yt = ekstrakIdYoutube(m.video);
+      const dr = yt ? null : ekstrakIdDrive(m.video);
+      if (!yt && !dr) return gagal('video-tidak-sah', 'video');
+      n.video_id = yt || dr; n.video_sumber = yt ? 'youtube' : 'drive';
+    }
+  } else if (!separa) { n.video_id = null; n.video_sumber = 'youtube'; }
+  const gs = medanGambar(m, n, 'thumbnail'); if (gs) return gs;
   if (ada(m, 'pratonton')) {
     if (typeof m.pratonton !== 'boolean') return gagal('pratonton-tidak-sah', 'pratonton');
     n.pratonton = m.pratonton ? 1 : 0;
