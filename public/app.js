@@ -47,6 +47,19 @@ function blokPenafian() {
   const t = String(konfig.laman.penafian_teks ?? '').trim();
   return t ? `<aside class="penafian" role="note">${IKON_INFO}<p>${barisBaru(t)}</p></aside>` : '';
 }
+// Ringkasan dengan "Lihat lagi": huraian panjang dipotong pada sempadan perkataan dan dikembangkan oleh pengguna.
+// Teks pendek dipapar penuh tanpa butang. Semua teks melalui h(); baris baharu hanya selepas escape.
+const MAKS_RINGKAS = 140;
+function teksRingkas(teks, maks = MAKS_RINGKAS) {
+  const t = String(teks ?? '').trim();
+  if (!t) return '';
+  if (t.length <= maks) return barisBaru(t);
+  let pendek = t.slice(0, maks);
+  const ruang = pendek.lastIndexOf(' ');
+  if (ruang > maks * 0.6) pendek = pendek.slice(0, ruang);
+  pendek = pendek.replace(/[\s,.;:\-\u2013]+$/, '');
+  return `<span class="ringkas"><span class="rk-pendek">${h(pendek)}&hellip;</span><span class="rk-penuh" hidden>${barisBaru(t)}</span> <button type="button" class="lihat-lagi" data-act="lihat-lagi" aria-expanded="false">Lihat lagi</button></span>`;
+}
 const ayatPertama = (t) => String(t ?? '').trim().split(/(?<=[.!?])\s/)[0];
 function footerPenafian() {
   const t = String(konfig.laman.penafian_teks ?? '').trim();
@@ -243,7 +256,7 @@ function kadCourse(c, i) {
       ${c.kategori ? `<span class="lencana-kat">${h(c.kategori.nama)}</span>` : ''}
       <p class="course-level">${khas ? `Untuk ${h(LABEL_GOL[c.golongan])}${c.terkunci_golongan ? ' (perlu kod)' : ''}` : 'Terbuka kepada semua'}</p>
       <h3>${h(c.tajuk)}</h3>
-      ${c.huraian ? `<p class="course-desc">${h(c.huraian)}</p>` : ''}
+      ${c.huraian ? `<p class="course-desc">${teksRingkas(c.huraian)}</p>` : ''}
       <div class="course-meta">${c.guru ? `<span>Bersama ${h(c.guru)}</span>` : ''}<span>${c.bil_subject} kuliah video</span>${c.selesai != null ? `<span>${c.selesai} khatam</span>` : ''}</div>
     </div>
     <div class="course-foot">${kiri}${kanan}</div>
@@ -652,7 +665,7 @@ async function halamanCourse(slug) {
     <div class="page-head">
       <nav class="crumb" style="margin-bottom:14px"><a href="#/">Utama</a><span>/</span><a href="#/kuliah">Kuliah saya</a><span>/</span><span style="color:var(--ink-2)">${h(d.course.tajuk)}</span></nav>
       <div class="page-head-top">
-        <div><h1>${h(d.course.tajuk)}</h1>${d.course.guru ? `<p class="sub guru-siri">Bersama ${h(d.course.guru)}</p>` : ''}${d.course.huraian ? `<p class="sub">${h(d.course.huraian)}</p>` : ''}</div>
+        <div><h1>${h(d.course.tajuk)}</h1>${d.course.guru ? `<p class="sub guru-siri">Bersama ${h(d.course.guru)}</p>` : ''}${d.course.huraian ? `<p class="sub">${teksRingkas(d.course.huraian, 220)}</p>` : ''}</div>
         ${d.log_masuk ? `<div class="head-stat"><b class="tnum">${pct(s, n)}%</b><span>${s} daripada ${n} selesai</span></div>` : ''}
       </div>
       <div class="pilltabs">
@@ -827,7 +840,7 @@ async function halamanSubject(id) {
             <button role="tab" aria-selected="false" data-act="tab" data-tab="soalan">${labelTabSoalan(d)}</button>
           </div></div>
           <div class="panel-body">
-            <div class="notes" data-pane="huraian">${s.huraian ? `<p>${h(s.huraian)}</p>` : '<p class="kosong-nota">Tiada huraian untuk kuliah ini.</p>'}</div>
+            <div class="notes" data-pane="huraian">${s.huraian ? `<p>${teksRingkas(s.huraian, 300)}</p>` : '<p class="kosong-nota">Tiada huraian untuk kuliah ini.</p>'}</div>
             ${d.bil_nota ? `<div class="notes" data-pane="nota" hidden>${paparNota(d, s)}</div>` : ''}
             <div class="notes" data-pane="soalan" hidden>${paparSoalan(d)}</div>
           </div>
@@ -933,6 +946,14 @@ function halamanAkaun() {
 // ---------- tindakan ----------
 
 const TINDAKAN = {
+  'lihat-lagi'(el) {
+    const r = el.closest('.ringkas');
+    const buka = el.getAttribute('aria-expanded') !== 'true';
+    r.querySelector('.rk-pendek').hidden = buka;
+    r.querySelector('.rk-penuh').hidden = !buka;
+    el.setAttribute('aria-expanded', String(buka));
+    el.textContent = buka ? 'Tutup' : 'Lihat lagi';
+  },
   'buka-lapor': (el) => bukaLapor(kuliahSemasaId, el.dataset.soalan),
   'tapis-kat': (el) => paparTapis(el.dataset.tapis, el.dataset.kat),
   selesai: (el) => tandaSelesai(el.dataset.id),

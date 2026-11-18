@@ -472,3 +472,17 @@ a.course:hover .thumb>div:first-child{transform:scale(1.07)}
 .p-admin .catatan-laporan{margin:8px 0;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-sm)}
 .p-admin .catatan-laporan small{display:block;color:var(--ink-3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .p-admin .catatan-laporan p{margin:2px 0 0;overflow-wrap:anywhere}
+
+/* ===== Pembetulan telefon: hero tidak boleh melebihi skrin =====
+   Tajuk kuliah yang panjang (white-space:nowrap pada .preview-judul) memaksa lajur grid 1fr melebar melebihi skrin sehingga kad
+   video dan statistik terpotong di kanan. minmax(0,...) dan min-width:0 membenarkan lajur mengecil. */
+.hero-inner{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
+.hero-inner>*{min-width:0}
+.preview-card{min-width:0;max-width:100%;box-sizing:border-box}
+.preview-head,.karusel,.slaid{min-width:0}
+@media (max-width:1080px){.hero-inner{grid-template-columns:minmax(0,1fr)}.preview-card{max-width:520px;width:100%;margin-inline:auto}}
+
+/* ===== Ringkasan huraian dengan "Lihat lagi" ===== */
+.lihat-lagi{display:inline;padding:6px 2px;margin:0;border:0;background:none;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px;-webkit-tap-highlight-color:transparent}
+.lihat-lagi:focus-visible{outline:3px solid var(--accent-soft);border-radius:4px}
+.ringkas{overflow-wrap:anywhere}
