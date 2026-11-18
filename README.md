@@ -1,7 +1,7 @@
 # LMS percuma (tanpa bayaran)
 
 Sistem kuliah dalam talian: pelajar mendaftar dengan akaun Google dan terus boleh menonton. Tiada bayaran, tiada langganan.
-Berjalan di Cloudflare (Workers + D1) pada pelan percuma. JavaScript biasa, tiada build step.
+Berjalan di Cloudflare (Workers + D1) pada pelan percuma. JavaScript biasa, tiada build step. Cuba
 
 ## Apa yang ada
 
