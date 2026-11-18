@@ -11,14 +11,14 @@ import { h, paparMarkdown, tarikhMy } from './lib/artikel.js';
 const HTML = { 'content-type': 'text/html; charset=utf-8' };
 const MAKS_SENARAI = 100;
 
-const keluarHtml = (isi, status = 200, kepala = {}) => new Response(isi, { status, headers: { ...HTML, 'x-content-type-options': 'nosniff', ...kepala } });
+export const keluarHtml = (isi, status = 200, kepala = {}) => new Response(isi, { status, headers: { ...HTML, 'x-content-type-options': 'nosniff', ...kepala } });
 const teksBiasa = (isi, jenis) => new Response(isi, { headers: { 'content-type': jenis + '; charset=utf-8', 'cache-control': 'public, max-age=900' } });
 
-async function muatLaman(repo) {
+export async function muatLaman(repo) {
   try { const g = gabungTetapan(await repo.semuaTetapan()); return { ...g.nilai, logo: urlLogo(g) }; } catch { return { ...LALAI, logo: null }; }
 }
 
-function bingkai({ laman, tapak, tajuk, deskripsi, kanonik, noindex, jsonld, jenisOg = 'website', gambar = null, badan }) {
+export function bingkai({ laman, tapak, tajuk, deskripsi, kanonik, noindex, jsonld, jenisOg = 'website', gambar = null, badan }) {
   const logo = laman.logo ? `<span class="mark ada-logo"><img class="logo-img" src="${h(laman.logo)}" alt=""></span>` : '<span class="mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="1.6" stroke="currentColor" stroke-width="1.6" transform="rotate(45 12 12)"/></svg></span>';
   const gambarOg = tapak + (gambar || (laman.logo ? '/api/logo' : '/ikon/ikon-512.png'));
   const brand = `<a class="brand" href="/">${logo}<span><span class="brand-name">${h(laman.nama)}</span>${laman.tagline ? `<span class="brand-sub">${h(laman.tagline)}</span>` : ''}</span></a>`;
@@ -61,7 +61,7 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
 <main>${badan}</main>
 <footer class="site-footer"><div class="wrap">
   <div class="foot-bottom" style="border-top:0;padding-top:28px">
-    <span>&copy; ${new Date().getFullYear()} ${h(laman.nama)}. Hak cipta terpelihara.</span>
+    <span>&copy; ${new Date().getFullYear()} ${h(laman.nama)}. Hak cipta terpelihara. <a href="/privasi">Dasar Privasi</a></span>
     ${laman.emel_hubungan ? `<span>Hubungi: <a href="mailto:${h(laman.emel_hubungan)}">${h(laman.emel_hubungan)}</a></span>` : ''}
   </div>
 </div></footer>

@@ -64,6 +64,16 @@ try {
   await post(`course/${pendek.id}/subject`, { tajuk: 'K1', video: 'ccccccccccc', status: 'terbit', pratonton: true });
   await ctxAdmin.close();
 
+  await langkah('/privasi: dihidang oleh Worker (bukan shell SPA) dengan kandungan penuh; laman utama ada pautan dalam HTML mentah', async () => {
+    const r = await fetch(B + '/privasi');
+    assert.equal(r.status, 200);
+    const html = await r.text();
+    assert.ok(html.includes('<h1>Dasar Privasi') && html.includes('Data yang kami kumpul'), 'bukan halaman privasi sebenar');
+    assert.ok(!html.includes('id="akar"'), 'dihidang shell SPA, bukan halaman pelayan');
+    const utama = await (await fetch(B + '/')).text();
+    assert.ok(utama.includes('href="/privasi"'), 'laman utama tiada pautan /privasi dalam HTML mentah');
+  });
+
   await langkah('hero: kad video dan statistik muat dalam skrin pada 360, 390 dan 450px walaupun tajuk panjang; kad di tengah', async () => {
     for (const lebar of [360, 390, 450]) {
       const { ctx, page: p } = await konteks(lebar, null);

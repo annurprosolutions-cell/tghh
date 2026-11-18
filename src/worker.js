@@ -17,6 +17,7 @@ import { halamanArtikel } from './artikel-halaman.js';
 import { pastikanSkema } from './skema.js';
 import { gabungTetapan, urlLogo, LALAI, ciriAktif } from './lib/tetapan.js';
 import { sijilHalaman } from './sijil-halaman.js';
+import { privasiHalaman } from './privasi-halaman.js';
 import { buatSandaran } from './sandaran.js';
 import { golonganEfektif, LABEL as LABEL_GOLONGAN } from './lib/golongan.js';
 
@@ -71,6 +72,8 @@ export async function handle(req, env, opts = {}) {
     return new Response(obj.body, { headers: { 'content-type': { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg' }[m[2]],
       'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
   }
+
+  if (p === '/privasi' || p === '/privasi/') return privasiHalaman(req, env, url, repo);
 
   if (p.startsWith('/sijil/') && req.method === 'GET') {
     if (!(await ciriAktif(repo, 'sijil_aktif'))) return new Response('Tidak dijumpai', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'x-robots-tag': 'noindex' } });

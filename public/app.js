@@ -63,7 +63,7 @@ function teksRingkas(teks, maks = MAKS_RINGKAS) {
 const ayatPertama = (t) => String(t ?? '').trim().split(/(?<=[.!?])\s/)[0];
 function footerPenafian() {
   const t = String(konfig.laman.penafian_teks ?? '').trim();
-  return t ? `<footer class="foot-penafian"><p>${barisBaru(t)}</p></footer>` : '';
+  return `<footer class="foot-penafian">${t ? `<p>${barisBaru(t)}</p>` : ''}<p><a href="/privasi">Dasar Privasi</a></p></footer>`;
 }
 // Penapis kategori: senarai disimpan dalam TAPIS supaya klik cip memaparkan semula tanpa permintaan baharu.
 const TAPIS = {};
@@ -452,7 +452,7 @@ async function lamanAwam() {
           ${konfig.laman.emel_hubungan ? `<p>Hubungi: <a href="mailto:${h(konfig.laman.emel_hubungan)}">${h(konfig.laman.emel_hubungan)}</a></p>` : ''}
         </div>
         <div><h4>Siri kuliah</h4><ul>${senarai.slice(0, 5).map((c) => `<li><a href="#/course/${encodeURIComponent(c.slug)}">${h(c.tajuk)}</a></li>`).join('')}</ul></div>
-        <div><h4>Akaun</h4><ul><li><a href="#/masuk">Log masuk</a></li>${artikel.length ? '<li><a href="/artikel">Artikel</a></li>' : ''}</ul></div>
+        <div><h4>Akaun</h4><ul><li><a href="#/masuk">Log masuk</a></li><li><a href="/privasi">Dasar Privasi</a></li>${artikel.length ? '<li><a href="/artikel">Artikel</a></li>' : ''}</ul></div>
       </div>
       <div class="foot-bottom">
         <span>&copy; ${new Date().getFullYear()} ${h(konfig.laman.nama)}. Hak cipta terpelihara.</span>
@@ -490,6 +490,7 @@ function halamanMasuk() {
         <div class="gsi" id="google"></div>
         <p class="nota-gsi">Kami hanya menerima nama dan emel anda daripada Google.</p>
         ${String(konfig.laman.privasi_teks ?? '').trim() ? `<p class="nota-gsi nota-privasi"><b>Privasi.</b> ${barisBaru(String(konfig.laman.privasi_teks).trim())}</p>` : ''}
+        <p class="nota-gsi"><a href="/privasi" target="_blank" rel="noopener">Baca Dasar Privasi penuh</a></p>
         ${ayatPertama(konfig.laman.penafian_teks) ? `<p class="nota-gsi nota-penafian"><b>Penafian.</b> ${h(ayatPertama(konfig.laman.penafian_teks))}</p>` : ''}
         <div class="auth-foot"><span><a href="#/" class="on">Bahasa Malaysia</a></span><span>${h(konfig.laman.nama)}</span></div>
       </div>
