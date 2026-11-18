@@ -679,8 +679,84 @@ const RALAT_SOALAN = {
   'tiada-akses': 'Log masuk untuk bertanya pada kuliah ini.',
   'asal-tidak-dibenarkan': 'Permintaan ditolak. Muat semula halaman dan cuba lagi.',
 };
+// ---------- lapor kandungan (S-10, F-17) ----------
+const SEBAB_LAPOR = [['salah-fakta', 'Salah fakta'], ['kebencian-takfir', 'Kandungan kebencian atau takfir'], ['tiada-rujukan', 'Tiada rujukan'], ['lain', 'Lain-lain']];
+const RALAT_LAPOR = {
+  'sebab-tidak-sah': 'Pilih sebab laporan.',
+  'catatan-terlalu-panjang': 'Catatan maksimum 500 aksara.',
+  'laporan-pendua': 'Anda sudah menghantar laporan yang sama dalam 24 jam lepas.',
+  'had-harian': 'Anda sudah mencapai had 5 laporan sehari. Cuba lagi esok.',
+  'tiada-akses': 'Anda tidak boleh melapor kuliah ini.',
+  'tidak-dijumpai': 'Kuliah ini tidak dijumpai atau sudah ditarik balik.',
+  'soalan-tidak-sah': 'Soalan ini sudah tidak boleh dilapor.',
+  'asal-tidak-dibenarkan': 'Permintaan ditolak. Muat semula laman.',
+};
+let kuliahSemasaId = null;
+function toast(teks) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div');
+  t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = teks;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+function tutupLapor() {
+  const m = document.querySelector('.modal-latar');
+  if (!m) return;
+  const balik = m._fokusAsal;
+  m.remove();
+  document.body.style.overflow = '';
+  removeEventListener('keydown', tutupLaporEsc);
+  if (balik && document.contains(balik)) balik.focus();
+}
+const tutupLaporEsc = (e) => { if (e.key === 'Escape') tutupLapor(); };
+function bukaLapor(subjectId, soalanId) {
+  if (!saya) { location.hash = '#/masuk'; return; }
+  tutupLapor();
+  const m = document.createElement('div');
+  m.className = 'modal-latar';
+  m._fokusAsal = document.activeElement;
+  m.innerHTML = `<div class="modal-kotak" role="dialog" aria-modal="true" aria-labelledby="tajukLapor">
+    <h2 id="tajukLapor">Lapor kandungan</h2>
+    <p class="modal-sub">${soalanId ? 'Soalan atau jawapan ini' : 'Kuliah ini'} mengandungi masalah? Admin akan menyemaknya.</p>
+    <form novalidate>
+      <fieldset class="lapor-sebab"><legend>Sebab</legend>
+        ${SEBAB_LAPOR.map(([k, t]) => `<label class="lapor-pilih"><input type="radio" name="sebab" value="${k}"><span>${h(t)}</span></label>`).join('')}
+      </fieldset>
+      <label for="catatanLapor">Catatan (pilihan)</label>
+      <textarea id="catatanLapor" name="catatan" maxlength="500" rows="4" placeholder="Terangkan masalah yang anda nampak"></textarea>
+      <small id="kiraLapor" class="qa-kiraan">0 / 500</small>
+      <div class="qa-ralat" role="alert" hidden></div>
+      <div class="modal-tindakan"><button type="button" class="btn outline" data-lapor="batal">Batal</button><button type="submit" class="btn primary">Hantar</button></div>
+    </form></div>`;
+  document.body.appendChild(m);
+  document.body.style.overflow = 'hidden';
+  addEventListener('keydown', tutupLaporEsc);
+  const borang = m.querySelector('form'), ralat = m.querySelector('.qa-ralat');
+  const ta = m.querySelector('#catatanLapor');
+  ta.addEventListener('input', () => { m.querySelector('#kiraLapor').textContent = `${ta.value.length} / 500`; });
+  m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-lapor=batal]')) tutupLapor(); });
+  m.querySelector('input[name=sebab]').focus();
+  borang.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    ralat.hidden = true;
+    const sebab = borang.querySelector('input[name=sebab]:checked')?.value;
+    if (!sebab) { ralat.textContent = RALAT_LAPOR['sebab-tidak-sah']; ralat.hidden = false; return; }
+    const butang = borang.querySelector('button[type=submit]');
+    butang.disabled = true;
+    try {
+      const r = await fetch('/api/laporan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subject_id: Number(subjectId), ...(soalanId ? { soalan_id: Number(soalanId) } : {}), sebab, catatan: ta.value }) });
+      if (r.status === 401) { tutupLapor(); saya = null; location.hash = '#/masuk'; return; }
+      if (!r.ok) { const j = await r.json().catch(() => ({})); ralat.textContent = RALAT_LAPOR[j.ralat] || 'Laporan gagal dihantar. Cuba lagi.'; ralat.hidden = false; return; }
+      tutupLapor();
+      toast('Terima kasih. Laporan anda telah dihantar kepada admin.');
+    } catch { ralat.textContent = 'Sambungan terputus. Cuba lagi.'; ralat.hidden = false; }
+    finally { butang.disabled = false; }
+  });
+}
+
 const itemSoalan = (q) => `<article class="qa-item"><div class="qa-q"><div class="qa-kepala"><b>${h(q.nama)}</b><small>${tarikhMy(q.dicipta_pada)}</small></div><p>${h(q.teks)}</p></div>
-  <div class="qa-a"><div class="qa-kepala"><span class="badge free">${h(q.penjawab || 'Guru')}</span><small>${tarikhMy(q.dijawab_pada)}</small></div><p>${h(q.jawapan)}</p></div></article>`;
+  <div class="qa-a"><div class="qa-kepala"><span class="badge free">${h(q.penjawab || 'Guru')}</span><small>${tarikhMy(q.dijawab_pada)}</small></div><p>${h(q.jawapan)}</p>
+  <div class="qa-lapor"><button type="button" class="btn sm ghost" data-act="buka-lapor" data-soalan="${q.id}">Lapor soalan ini</button></div></div></article>`;
 
 // Tab soal jawab. Pelajar lain hanya nampak soalan yang sudah dijawab; penanya nampak soalannya sendiri yang menunggu jawapan.
 function paparSoalan(d) {
@@ -718,6 +794,7 @@ function paparNota(d, s) {
 
 async function halamanSubject(id) {
   const d = await dapat('/api/subject/' + encodeURIComponent(id));
+  kuliahSemasaId = d.subject.id;
   const siri = await dapat('/api/course/' + encodeURIComponent(d.course.slug));
   const s = d.subject;
   const n = siri.subject.length, khatam = siri.subject.filter((x) => x.selesai).length;
@@ -736,7 +813,7 @@ async function halamanSubject(id) {
       </div>
       <div class="pilltabs">
         <span class="badge free" style="height:36px;padding:0 14px;border-radius:999px">KULIAH PERCUMA</span>
-        ${s.boleh_tonton ? `<span id="kotak-selesai">${butangSelesai(s)}</span>` : ''}
+        ${s.boleh_tonton ? `<span id="kotak-selesai">${butangSelesai(s)}</span><button type="button" data-act="buka-lapor" class="butang-lapor">Lapor</button>` : ''}
       </div>
     </div>
     <div class="lesson-grid" style="margin-top:16px">
@@ -856,6 +933,7 @@ function halamanAkaun() {
 // ---------- tindakan ----------
 
 const TINDAKAN = {
+  'buka-lapor': (el) => bukaLapor(kuliahSemasaId, el.dataset.soalan),
   'tapis-kat': (el) => paparTapis(el.dataset.tapis, el.dataset.kat),
   selesai: (el) => tandaSelesai(el.dataset.id),
   async keluar() { await fetch('/auth/keluar', { method: 'POST' }); saya = null; location.hash = '#/'; laluan(); },

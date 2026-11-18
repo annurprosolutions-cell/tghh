@@ -1,8 +1,8 @@
 // Repo dalam memori dengan antara muka yang sama seperti repoD1 (src/repo.js).
 export function repoPalsu() {
-  const pengguna = new Map(), sesi = new Map(), kategoriM = new Map();
+  const pengguna = new Map(), sesi = new Map(), kategoriM = new Map(), laporanM = new Map();
   const courses = new Map(), subjects = new Map(), progress = new Map(), notas = new Map(), tetapan = new Map(), artikel = new Map(), gurus = new Map(), semakan = new Map(), soalan = new Map(), kodD = new Map(), kodG = [], kodC = [], adminT = new Map(), sijilM = []; let idC = 1, idS = 1, idN = 1, idA = 1, idK = 1, idQ = 1, idKD = 1;
-  let idSeterusnya = 1, idKat = 1;
+  let idSeterusnya = 1, idKat = 1, idLap = 1;
   return {
     _pengguna: pengguna, _sesi: sesi, _course: courses, _subject: subjects, _progress: progress,
     async simpanPengguna(p, masa) {
@@ -108,6 +108,7 @@ export function repoPalsu() {
       for (const [k, n] of notas) if (n.subject_id === id) notas.delete(k);
       for (const [k, s] of semakan) if (s.jenis === 'subject' && s.sasaran_id === id) semakan.delete(k);
       for (const [k, q] of soalan) if (q.subject_id === id) soalan.delete(k);
+      for (const [k, l] of laporanM) if (l.subject_id === id) laporanM.delete(k);
     },
     async senaraiArtikel({ termasukDraf = false } = {}) {
       return [...artikel.values()].filter((a) => termasukDraf || a.status === 'terbit').map(({ isi, ...r }) => r)
@@ -183,6 +184,18 @@ export function repoPalsu() {
       return [...notas.values()].filter((n) => n.status === 'menunggu').map((n) => { const s = subjects.get(n.subject_id), c = courses.get(s.course_id);
         return { id: n.id, nama: n.nama, saiz: n.saiz, subject_id: s.id, subject_tajuk: s.tajuk, course_id: c.id, course_tajuk: c.tajuk, guru_emel: c.guru_emel ?? null }; });
     },
+    async ciptaLaporan(l, masa) { const b = { id: idLap++, subject_id: l.subject_id, soalan_id: l.soalan_id ?? null, pengguna_id: l.pengguna_id, sebab: l.sebab, catatan: l.catatan ?? '', status: 'baru', catatan_admin: null, dicipta_pada: masa, dikemas_kini_pada: null }; laporanM.set(b.id, b); return b; },
+    async bilLaporanSejak(pid, sejak) { return [...laporanM.values()].filter((x) => x.pengguna_id === pid && x.dicipta_pada >= sejak).length; },
+    async adaLaporanSama(pid, sid, sebab, sejak) { return [...laporanM.values()].some((x) => x.pengguna_id === pid && x.subject_id === sid && x.sebab === sebab && x.dicipta_pada >= sejak); },
+    async laporanDariId(id) { return laporanM.get(id) ?? null; },
+    async senaraiLaporan({ status = 'baru' } = {}) {
+      return [...laporanM.values()].filter((l) => status === 'semua' || l.status === status).sort((a, b) => String(b.dicipta_pada).localeCompare(String(a.dicipta_pada)) || b.id - a.id)
+        .map((l) => { const s = subjects.get(l.subject_id), c = s && courses.get(s.course_id), p = [...pengguna.values()].find((x) => x.id === l.pengguna_id), q = l.soalan_id ? soalan.get(l.soalan_id) : null;
+          return { id: l.id, subject_id: l.subject_id, soalan_id: l.soalan_id, sebab: l.sebab, catatan: l.catatan, status: l.status, catatan_admin: l.catatan_admin, dicipta_pada: l.dicipta_pada, dikemas_kini_pada: l.dikemas_kini_pada,
+            subject_tajuk: s?.tajuk, subject_status: s?.status, course_id: c?.id, course_tajuk: c?.tajuk, nama_pelapor: p?.nama, emel_pelapor: p?.emel, soalan_teks: q?.teks ?? null }; });
+    },
+    async bilLaporanBaharu() { return [...laporanM.values()].filter((l) => l.status === 'baru').length; },
+    async kemaskiniLaporan(id, nilai, masa) { const l = laporanM.get(id); for (const k of ['status', 'catatan_admin']) if (k in nilai) l[k] = nilai[k]; l.dikemas_kini_pada = masa; return l; },
     async senaraiKategori() {
       return [...kategoriM.values()].sort((a, b) => a.urutan - b.urutan || a.id - b.id).map((k) => { const cs = [...courses.values()].filter((c) => c.kategori_id === k.id);
         return { ...k, bil_course: cs.length, bil_course_terbit: cs.filter((c) => c.status === 'terbit').length }; });

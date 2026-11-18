@@ -10,6 +10,7 @@ import { golonganEfektif, keterlihatan, normalKod, kodBolehGuna, tamatSelepasTeb
 import { perananPenuh } from './lib/peranan.js';
 import { kodSijil, sahkanNamaSijil, layakSijil } from './lib/sijil.js';
 import { sahkanSoalan, namaPertama, awalHari, HAD_SEHARI } from './lib/soalan.js';
+import { sahkanLaporan, HAD_LAPORAN_SEHARI } from './lib/laporan.js';
 
 const idDari = (x) => { const n = Number(x); return Number.isInteger(n) && n > 0 ? n : null; };
 
@@ -194,6 +195,31 @@ export async function pelajarApi(req, env, url, repo, now) {
     if ((await repo.bilSoalanSejak(k.pengguna.id, awalHari(k.hari))) >= HAD_SEHARI) return json({ ralat: 'had-harian', had: HAD_SEHARI }, 429);
     const q = await repo.ciptaSoalan(t.s.id, k.pengguna.id, v.nilai, new Date(now).toISOString());
     return json({ id: q.id, teks: q.teks, dicipta_pada: q.dicipta_pada }, 201);
+  }
+
+  // Lapor kandungan (F-17): ahli berdaftar sahaja. Mesti layak menonton kuliah itu. Had 5 sehari; laporan yang sama
+  // (kuliah + sebab) tidak boleh dihantar lebih sekali dalam 24 jam.
+  if (bahagian[0] === 'laporan' && bahagian.length === 1 && req.method === 'POST') {
+    const asal = req.headers.get('origin');
+    if (asal && asal !== url.origin) return json({ ralat: 'asal-tidak-dibenarkan' }, 403);
+    if (!logMasuk) return json({ ralat: 'belum-log-masuk' }, 401);
+    if (!(req.headers.get('content-type') || '').includes('application/json')) return json({ ralat: 'JSON sahaja' }, 415);
+    let teks; try { teks = await req.text(); } catch { return json({ ralat: 'JSON tidak sah' }, 400); }
+    if (teks.length > 5000) return json({ ralat: 'badan-terlalu-besar' }, 413);
+    let b; try { b = JSON.parse(teks); } catch { return json({ ralat: 'JSON tidak sah' }, 400); }
+    const v = sahkanLaporan(b); if (!v.ok) return json({ ralat: v.sebab, ...(v.medan ? { medan: v.medan } : {}) }, 400);
+    const t = await subjectTerbit(repo, v.nilai.subject_id);
+    if (!t || keterlihatan(t.c.golongan, k.golongan) === 'sembunyi') return json({ ralat: 'tidak-dijumpai' }, 404);
+    if (!keputusanSubject({ course: t.c, subject: t.s, logMasuk, golongan: k.golongan }).akses) return json({ ralat: 'tiada-akses' }, 403);
+    if (v.nilai.soalan_id) { // hanya soalan awam pada kuliah yang sama boleh dilapor
+      const q = await repo.soalanDariId(v.nilai.soalan_id);
+      if (!q || q.subject_id !== t.s.id || q.jawapan == null || q.tersembunyi) return json({ ralat: 'soalan-tidak-sah', medan: 'soalan_id' }, 400);
+    }
+    const masa = new Date(now).toISOString();
+    if (await repo.adaLaporanSama(k.pengguna.id, t.s.id, v.nilai.sebab, new Date(now - 864e5).toISOString())) return json({ ralat: 'laporan-pendua' }, 409);
+    if ((await repo.bilLaporanSejak(k.pengguna.id, awalHari(k.hari))) >= HAD_LAPORAN_SEHARI) return json({ ralat: 'had-harian', had: HAD_LAPORAN_SEHARI }, 429);
+    const l = await repo.ciptaLaporan({ ...v.nilai, pengguna_id: k.pengguna.id }, masa);
+    return json({ id: l.id, ok: true }, 201);
   }
 
   // Penanya boleh menarik balik soalannya selagi belum dijawab.

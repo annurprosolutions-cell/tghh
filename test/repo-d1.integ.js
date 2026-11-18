@@ -410,3 +410,39 @@ test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai,
     assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '2');
   } finally { await p2.dispose(); }
 });
+
+// ---------- Fasa 4: laporan kandungan ----------
+
+test('laporan: cipta, had harian, pendua, senarai bersama kuliah dan pelapor, kemas kini status, padam kuliah turut padam laporan', async () => {
+  const p = await repo.simpanPengguna({ emel: 'pelapor@gmail.com', sub: 'sub-pelapor-f4-1', nama: 'Pelapor' }, 't');
+  const p2 = await repo.simpanPengguna({ emel: 'pelapor2@gmail.com', sub: 'sub-pelapor-f4-2', nama: 'Pelapor Dua' }, 't');
+  const c = await repo.ciptaCourse({ tajuk: 'Siri Laporan', slug: await repo.slugUnik('siri-laporan'), status: 'terbit' }, 't');
+  const s1 = await repo.ciptaSubject(c.id, { tajuk: 'K Laporan 1', video_id: 'aaaaaaaaaaa', status: 'terbit' }, 't');
+  const s2 = await repo.ciptaSubject(c.id, { tajuk: 'K Laporan 2', video_id: 'bbbbbbbbbbb', status: 'terbit' }, 't');
+  const sebelum = await repo.bilLaporanBaharu();
+  const l = await repo.ciptaLaporan({ subject_id: s1.id, pengguna_id: p.id, sebab: 'salah-fakta', catatan: 'Tarikh <b>salah</b>' }, '2026-11-18T02:00:00.000Z');
+  assert.deepEqual([l.status, l.soalan_id, l.catatan_admin, l.sebab, l.catatan], ['baru', null, null, 'salah-fakta', 'Tarikh <b>salah</b>']);
+  await repo.ciptaLaporan({ subject_id: s2.id, pengguna_id: p.id, sebab: 'lain' }, '2026-11-18T03:00:00.000Z');
+  await repo.ciptaLaporan({ subject_id: s2.id, pengguna_id: p2.id, sebab: 'lain' }, '2026-11-17T01:00:00.000Z');
+  assert.equal(await repo.bilLaporanSejak(p.id, '2026-11-17T16:00:00.000Z'), 2); // hari ini (waktu Malaysia)
+  assert.equal(await repo.bilLaporanSejak(p2.id, '2026-11-17T16:00:00.000Z'), 0);
+  assert.equal(await repo.adaLaporanSama(p.id, s1.id, 'salah-fakta', '2026-11-17T02:00:00.000Z'), true);
+  assert.equal(await repo.adaLaporanSama(p.id, s1.id, 'lain', '2026-11-17T02:00:00.000Z'), false);
+  assert.equal(await repo.adaLaporanSama(p2.id, s1.id, 'salah-fakta', '2026-11-17T02:00:00.000Z'), false);
+  assert.equal(await repo.bilLaporanBaharu(), sebelum + 3);
+  const senarai = (await repo.senaraiLaporan({ status: 'baru' })).filter((x) => [s1.id, s2.id].includes(x.subject_id));
+  assert.equal(senarai[0].dicipta_pada >= senarai[1].dicipta_pada, true); // terkini dahulu
+  const baris = senarai.find((x) => x.id === l.id);
+  assert.deepEqual([baris.subject_tajuk, baris.course_tajuk, baris.nama_pelapor, baris.emel_pelapor, baris.soalan_teks], ['K Laporan 1', 'Siri Laporan', 'Pelapor', 'pelapor@gmail.com', null]);
+  const k = await repo.kemaskiniLaporan(l.id, { status: 'disemak', catatan_admin: 'Sedang disemak', id: 9999, sebab: 'dirampas' }, 't2');
+  assert.deepEqual([k.id, k.status, k.catatan_admin, k.sebab, k.dikemas_kini_pada], [l.id, 'disemak', 'Sedang disemak', 'salah-fakta', 't2']); // hanya status dan catatan_admin
+  assert.equal((await repo.senaraiLaporan({ status: 'disemak' })).filter((x) => x.id === l.id).length, 1);
+  assert.ok((await repo.senaraiLaporan({ status: 'semua' })).length >= 3);
+  await repo.padamSubject(s2.id); // kunci asing: laporan dipadam bersama kuliah
+  assert.equal((await repo.senaraiLaporan({ status: 'semua' })).filter((x) => x.subject_id === s2.id).length, 0);
+  assert.equal(await repo.laporanDariId(l.id).then((x) => x.id), l.id);
+});
+
+test('laporan: kunci asing menghalang laporan untuk kuliah atau pengguna yang tidak wujud', async () => {
+  await assert.rejects(repo.ciptaLaporan({ subject_id: 987654, pengguna_id: 1, sebab: 'lain' }, 't'));
+});

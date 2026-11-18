@@ -127,6 +127,7 @@ export function repoD1(db) {
       db.prepare('DELETE FROM progress WHERE subject_id = ?').bind(id),
       db.prepare('DELETE FROM nota WHERE subject_id = ?').bind(id),
       db.prepare(`DELETE FROM semakan WHERE jenis = 'subject' AND sasaran_id = ?`).bind(id),
+      db.prepare('DELETE FROM laporan WHERE subject_id = ?').bind(id),
       db.prepare('DELETE FROM soalan WHERE subject_id = ?').bind(id),
       db.prepare('DELETE FROM subject WHERE id = ?').bind(id),
     ]),
@@ -158,6 +159,34 @@ export function repoD1(db) {
     },
     async bilCourseKategori(id) { return (await satu('SELECT COUNT(*) AS c FROM course WHERE kategori_id = ?', id)).c; },
     padamKategori: (id) => jalan('DELETE FROM kategori WHERE id = ?', id),
+
+    // ---- laporan kandungan (F-17) ----
+    async ciptaLaporan(l, masa) {
+      const r = await jalan(`INSERT INTO laporan (subject_id, soalan_id, pengguna_id, sebab, catatan, status, dicipta_pada) VALUES (?, ?, ?, ?, ?, 'baru', ?)`,
+        l.subject_id, l.soalan_id ?? null, l.pengguna_id, l.sebab, l.catatan ?? '', masa);
+      return satu('SELECT * FROM laporan WHERE id = ?', r.meta.last_row_id);
+    },
+    async bilLaporanSejak(penggunaId, sejak) { return (await satu('SELECT COUNT(*) AS c FROM laporan WHERE pengguna_id = ? AND dicipta_pada >= ?', penggunaId, sejak)).c; },
+    async adaLaporanSama(penggunaId, subjectId, sebab, sejak) {
+      return !!(await satu('SELECT 1 AS x FROM laporan WHERE pengguna_id = ? AND subject_id = ? AND sebab = ? AND dicipta_pada >= ?', penggunaId, subjectId, sebab, sejak));
+    },
+    laporanDariId: (id) => satu('SELECT * FROM laporan WHERE id = ?', id),
+    // Senarai untuk admin: status 'baru' | 'disemak' | 'selesai' | 'semua'. Emel pelapor hanya untuk admin.
+    async senaraiLaporan({ status = 'baru' } = {}) {
+      const di = status === 'semua' ? '' : 'WHERE l.status = ?';
+      const st = db.prepare(`SELECT l.id, l.subject_id, l.soalan_id, l.sebab, l.catatan, l.status, l.catatan_admin, l.dicipta_pada, l.dikemas_kini_pada,
+          s.tajuk AS subject_tajuk, s.status AS subject_status, s.course_id, c.tajuk AS course_tajuk, p.nama AS nama_pelapor, p.emel AS emel_pelapor,
+          q.teks AS soalan_teks
+        FROM laporan l JOIN subject s ON s.id = l.subject_id JOIN course c ON c.id = s.course_id JOIN pengguna p ON p.id = l.pengguna_id
+        LEFT JOIN soalan q ON q.id = l.soalan_id ${di} ORDER BY l.dicipta_pada DESC, l.id DESC LIMIT 200`);
+      return (await (status === 'semua' ? st : st.bind(status)).all()).results;
+    },
+    async bilLaporanBaharu() { return (await satu(`SELECT COUNT(*) AS c FROM laporan WHERE status = 'baru'`)).c; },
+    async kemaskiniLaporan(id, nilai, masa) {
+      const k = Object.keys(nilai).filter((x) => ['status', 'catatan_admin'].includes(x));
+      if (k.length) await jalan(`UPDATE laporan SET ${k.map((x) => x + ' = ?').join(', ')}, dikemas_kini_pada = ? WHERE id = ?`, ...k.map((x) => nilai[x]), masa, id);
+      return satu('SELECT * FROM laporan WHERE id = ?', id);
+    },
 
     // ---- guru dan kelulusan ----
     async senaraiGuru() {

@@ -11,6 +11,7 @@ import { sahkanCourse, sahkanSubject, sahkanKategori, sahkanProfilGuru, buatSlug
 import { sahkanArtikel, slugArtikel, MAKS_ISI } from './lib/artikel.js';
 import { MAKS_LOGO, sahkanTetapan, gabungTetapan, jenisGambar, urlLogo, LALAI } from './lib/tetapan.js';
 import { sahkanJawapan } from './lib/soalan.js';
+import { sahkanKemaskiniLaporan, STATUS_LAPORAN } from './lib/laporan.js';
 import { sahkanKodBaru, kodBaru, paparKod } from './lib/golongan.js';
 import { buatSandaran, senaraiSandaran, namaSandaranSah, AWALAN } from './sandaran.js';
 import { MAKS_SAIZ, MAKS_SETIAP_SUBJECT, namaNota, adaPdf, kunciBaru } from './lib/nota.js';
@@ -227,6 +228,24 @@ export async function adminApi(req, env, url, repo, now) {
       return json({ ok: true });
     }
     if (bahagian.length === 3 && anak === 'pengguna' && req.method === 'GET') return json(await repo.penggunaKod(id));
+    return json({ ralat: 'kaedah-tidak-disokong' }, 405);
+  }
+
+  // ---------------- laporan kandungan (admin sahaja) ----------------
+  if (sumber === 'laporan') {
+    if (bahagian.length === 1 && req.method === 'GET') {
+      const st = url.searchParams.get('status');
+      const status = st === 'semua' || STATUS_LAPORAN.includes(st) ? st : 'baru';
+      return json({ bil_baru: await repo.bilLaporanBaharu(), laporan: await repo.senaraiLaporan({ status }) });
+    }
+    if (!id) return json({ ralat: 'id-tidak-sah' }, 400);
+    const lap = await repo.laporanDariId(id);
+    if (!lap) return json({ ralat: 'tidak-dijumpai' }, 404);
+    if (bahagian.length === 2 && req.method === 'PUT') {
+      const b = await bacaJson(req); if (b.gagal) return b.gagal;
+      const v = sahkanKemaskiniLaporan(b.nilai); if (!v.ok) return ralatSah(v);
+      return json(await repo.kemaskiniLaporan(id, v.nilai, masa));
+    }
     return json({ ralat: 'kaedah-tidak-disokong' }, 405);
   }
 

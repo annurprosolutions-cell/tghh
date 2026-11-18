@@ -450,3 +450,25 @@ a.course:hover .thumb>div:first-child{transform:scale(1.07)}
 /* panel */
 .p-admin .lencana.kat{background:#FEF3C7;color:#7A4B00;border-color:transparent}
 .p-admin .rujukan-medan{font-size:16px;line-height:1.7;font-family:inherit}
+
+/* ===== Fasa 4: lapor kandungan (modal S-10), toast ===== */
+.modal-latar{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(12,24,48,.55)}
+.modal-kotak{width:100%;max-width:480px;max-height:calc(100vh - 32px);overflow:auto;background:var(--surface);color:var(--ink);border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow-float)}
+.modal-kotak h2{margin:0 0 4px;font-size:1.25rem}
+.modal-sub{margin:0 0 14px;color:var(--ink-2);font-size:14px;line-height:1.5}
+.lapor-sebab{border:0;margin:0 0 12px;padding:0}
+.lapor-sebab legend{font-weight:600;margin-bottom:6px}
+.lapor-pilih{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;margin:0 0 6px;border:1px solid var(--line-strong);border-radius:var(--r-sm);cursor:pointer;font-size:15px}
+.lapor-pilih:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.lapor-pilih input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.modal-kotak textarea{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);font:inherit;resize:vertical;min-height:96px}
+.qa-kiraan{display:block;margin:4px 0 8px;color:var(--ink-3);font-size:12px}
+.modal-tindakan{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.modal-tindakan .btn{min-height:44px}
+.butang-lapor{margin-inline-start:8px}
+.qa-lapor{margin-top:6px;text-align:end}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:1100;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:var(--r-md);background:#15803D;color:#fff;font-size:14px;font-weight:600;box-shadow:var(--shadow-float);text-align:center}
+.toast.ralat{background:#B91C1C}
+.p-admin .catatan-laporan{margin:8px 0;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-sm)}
+.p-admin .catatan-laporan small{display:block;color:var(--ink-3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.p-admin .catatan-laporan p{margin:2px 0 0;overflow-wrap:anywhere}
