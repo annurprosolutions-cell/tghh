@@ -11,7 +11,8 @@ const wrangler = (...a) => execFileSync('npx', ['wrangler', ...a, ...KONFIG], { 
 export const sha256 = (t) => createHash('sha256').update(t).digest('hex');
 export const tokenRawak = () => randomBytes(32).toString('base64url');
 
-export async function mulaWorker({ port, vars = {}, semaiSql = '' }) {
+// Ciri sijil dan kod dihidupkan dalam ujian hujung ke hujung supaya aliran itu diuji (lalai produksi: sembunyi).
+export async function mulaWorker({ port, vars = {}, semaiSql = '', ciri = { sijil_aktif: 'ya', kod_aktif: 'ya' } }) {
   const simpan = `.wrangler/e2e-${port}`;
   rmSync(simpan, { recursive: true, force: true });
   // Skema dipasang daripada src/skema.js (sama seperti yang Worker lakukan sendiri pada permintaan pertama).
@@ -19,6 +20,8 @@ export async function mulaWorker({ port, vars = {}, semaiSql = '' }) {
   const failSkema = `${simpan}/skema.sql`;
   writeFileSync(failSkema, LANGKAH.flat().map((x) => x.replace(/\s+/g, ' ') + ';').join('\n') + `\nINSERT INTO tetapan (kunci, nilai) VALUES ('skema_versi', '${LANGKAH.length}');\n`);
   wrangler('d1', 'execute', 'DB', '--local', '--persist-to', simpan, '--file', failSkema);
+  const tetapanCiri = Object.entries(ciri).map(([k, v]) => `('${k}', '${v}')`).join(', ');
+  if (tetapanCiri) wrangler('d1', 'execute', 'DB', '--local', '--persist-to', simpan, '--command', `INSERT INTO tetapan (kunci, nilai) VALUES ${tetapanCiri};`);
   if (semaiSql) wrangler('d1', 'execute', 'DB', '--local', '--persist-to', simpan, '--command', semaiSql);
   const argVar = Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`]);
   const dev = spawn('npx', ['wrangler', 'dev', '--local', '--port', String(port), '--persist-to', simpan, ...KONFIG, ...argVar],

@@ -15,7 +15,7 @@ import { adminApi } from './admin-api.js';
 import { pelajarApi } from './pelajar-api.js';
 import { halamanArtikel } from './artikel-halaman.js';
 import { pastikanSkema } from './skema.js';
-import { gabungTetapan, urlLogo, LALAI } from './lib/tetapan.js';
+import { gabungTetapan, urlLogo, LALAI, ciriAktif } from './lib/tetapan.js';
 import { sijilHalaman } from './sijil-halaman.js';
 import { buatSandaran } from './sandaran.js';
 import { golonganEfektif, LABEL as LABEL_GOLONGAN } from './lib/golongan.js';
@@ -72,7 +72,10 @@ export async function handle(req, env, opts = {}) {
       'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
   }
 
-  if (p.startsWith('/sijil/') && req.method === 'GET') return sijilHalaman(req, env, url, repo);
+  if (p.startsWith('/sijil/') && req.method === 'GET') {
+    if (!(await ciriAktif(repo, 'sijil_aktif'))) return new Response('Tidak dijumpai', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'x-robots-tag': 'noindex' } });
+    return sijilHalaman(req, env, url, repo);
+  }
 
   if (p === '/api/logo' && req.method === 'GET') {
     let g; try { g = gabungTetapan(await repo.semuaTetapan()); } catch { g = null; }

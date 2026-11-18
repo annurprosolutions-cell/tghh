@@ -32,7 +32,7 @@ const IKON = {
 // Menu pil di header. Item aktif ditanda ikut bahagian pertama hash.
 function binaMenu() {
   const item = PERANAN === 'admin'
-    ? [['course', '#/', 'Siri'], ['kategori', '#/kategori', 'Kategori'], ['kelulusan', '#/kelulusan', 'Kelulusan'], ['soalan', '#/soalan', 'Soal jawab'], ['laporan', '#/laporan', 'Laporan'], ['pengguna', '#/pengguna', 'Pengguna'], ['guru', '#/guru', 'Pasukan'], ['kod', '#/kod', 'Kod golongan'], ['artikel', '#/artikel', 'Artikel'], ['tetapan', '#/tetapan', 'Tetapan laman']]
+    ? [['course', '#/', 'Siri'], ['kategori', '#/kategori', 'Kategori'], ['kelulusan', '#/kelulusan', 'Kelulusan'], ['soalan', '#/soalan', 'Soal jawab'], ['laporan', '#/laporan', 'Laporan'], ['pengguna', '#/pengguna', 'Pengguna'], ['guru', '#/guru', 'Pasukan'], ...(KOD_AKTIF ? [['kod', '#/kod', 'Kod golongan']] : []), ['artikel', '#/artikel', 'Artikel'], ['tetapan', '#/tetapan', 'Tetapan laman']]
     : [['course', '#/', 'Siri saya'], ['soalan', '#/soalan', 'Soal jawab']];
   menuPanel.innerHTML = item.map(([k, href, label]) => `<a href="${href}" data-menu="${k}">${IKON[k]}<span>${label}</span>${k === 'kelulusan' ? '<span class="bil-pil" id="bilKelulusan" hidden></span>' : ''}${k === 'soalan' ? '<span class="bil-pil" id="bilSoalan" hidden></span>' : ''}${k === 'laporan' ? '<span class="bil-pil" id="bilLaporan" hidden></span>' : ''}</a>`).join('')
     + `<a href="/" data-menu="luar">${IKON.luar}<span>Laman pelajar</span></a>`;
@@ -702,6 +702,8 @@ document.addEventListener('input', (e) => { if (['isi', 'ringkasan', 'meta_descr
 // ---------- tetapan laman ----------
 
 const MEDAN_TETAPAN = [
+  ['sijil_aktif', 'Sijil khatam siri', 'pilih', 'Sembunyi: pelajar tidak nampak butang Dapatkan sijil, tab sijil di Akaun, dan halaman /sijil/<kod> ditutup. Sijil yang sudah dikeluarkan tidak dipadam. Hidupkan bila tajuk dan penandatangan sudah disahkan.'],
+  ['kod_aktif', 'Kod kelas (golongan)', 'pilih', 'Sembunyi: kotak Guna kod di Akaun dan tab Kod golongan disembunyikan. Siri berkunci kekal berkunci untuk orang awam. Data kod tidak dipadam.'],
   ['nama', 'Nama laman', 'input', 'Dipaparkan di header, footer dan tab pelayar.'],
   ['tagline', 'Tagline di bawah nama', 'input', 'Kosongkan untuk guna teks lalai.'],
   ['hero_tajuk', 'Tajuk utama (laman awam)', 'input', ''],
@@ -1124,6 +1126,11 @@ function pasangWarna(w) {
   try { localStorage.setItem('kh-warna', warna); } catch { /* storan disekat */ }
 }
 
+// Ciri yang boleh dihidupkan/disembunyikan dari Tetapan laman (sembunyi jika tidak dinyatakan).
+let KOD_AKTIF = false;
+async function muatCiri() {
+  try { const k = await (await fetch('/api/konfig')).json(); KOD_AKTIF = k.laman?.kod_aktif === 'ya'; } catch { KOD_AKTIF = false; }
+}
 async function mula() {
   fetch('/api/konfig').then((r) => r.json()).then((k) => {
     pasangWarna(k.laman?.warna);
@@ -1135,7 +1142,7 @@ async function mula() {
     PERANAN = d.pengguna.peranan;
     kotakPengguna.innerHTML = `<span class="role-chip" title="${h(d.pengguna.emel)}">${IKON.orang}<span class="rc-text"><small>${PERANAN === 'admin' ? 'Admin' : PERANAN === 'guru' ? 'Guru' : 'Pelajar'}</small><b>${h(d.pengguna.nama || d.pengguna.emel)}</b></span></span>
       <button class="kedua pil ikon-keluar" data-act="keluar" aria-label="Log keluar" title="Log keluar">${IKON.keluar}</button>`;
-    if (PERANAN === 'admin' || PERANAN === 'guru') binaMenu();
+    if (PERANAN === 'admin' || PERANAN === 'guru') { await muatCiri(); binaMenu(); }
     if (PERANAN !== 'admin' && PERANAN !== 'guru') {
       app.innerHTML = `<div class="kad"><h1>Tiada akses</h1><p>Akaun <b>${h(d.pengguna.emel)}</b> bukan admin atau guru. Hubungi pemilik jika ini satu kesilapan.</p><p><a href="/">Ke laman utama</a></p></div>`;
       return;

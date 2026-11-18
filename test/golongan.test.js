@@ -27,6 +27,7 @@ const klien = (repo, kuki, now = NOW) => async (kaedah, laluan, badan, header = 
 // '<golongan>-ahli' = kuliah biasa (perlu log masuk).
 async function sedia() {
   const repo = repoPalsu();
+  await repo.simpanTetapan({ kod_aktif: 'ya' }); // ciri kod dihidupkan untuk ujian ini (lalai sembunyi)
   const c = {};
   for (const g of ['awam', 'pelajar', 'ahli']) {
     for (const akses of ['percuma', 'ahli']) {

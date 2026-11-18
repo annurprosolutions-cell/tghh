@@ -426,7 +426,7 @@ async function lamanAwam() {
       <div class="steps">
         <div class="step" style="--i:0"><span class="step-no">LANGKAH 01</span><h3>Log masuk dengan Google</h3><p>Satu klik dengan akaun Google. Tiada kata laluan untuk diingat, dan semua kuliah terus terbuka.</p></div>
         <div class="step" style="--i:1"><span class="step-no">LANGKAH 02</span><h3>Tonton dan ikut kemajuan</h3><p>Kuliah yang ditonton hingga habis ditanda khatam secara automatik, jadi anda tahu di mana untuk sambung.</p></div>
-        <div class="step" style="--i:2"><span class="step-no">LANGKAH 03</span><h3>Khatam dan dapatkan sijil</h3><p>Selesaikan semua kuliah dalam satu siri untuk mendapat sijil penyertaan yang boleh dicetak dan disahkan.</p></div>
+        <div class="step" style="--i:2"><span class="step-no">LANGKAH 03</span><h3>${sijilAktif() ? 'Khatam dan dapatkan sijil' : 'Khatam setiap siri'}</h3><p>${sijilAktif() ? 'Selesaikan semua kuliah dalam satu siri untuk mendapat sijil penyertaan yang boleh dicetak dan disahkan.' : 'Selesaikan semua kuliah dalam satu siri untuk melihat kemajuan penuh anda.'}</p></div>
       </div>
     </div>
   </section>
@@ -480,7 +480,7 @@ function halamanMasuk() {
         <ul class="auth-points">
           <li><span class="check">&check;</span> Semua kuliah percuma</li>
           <li><span class="check">&check;</span> Log masuk sekali dengan akaun Google</li>
-          <li><span class="check">&check;</span> Kemajuan dan sijil disimpan dalam akaun</li>
+          <li><span class="check">&check;</span> ${sijilAktif() ? 'Kemajuan dan sijil disimpan dalam akaun' : 'Kemajuan disimpan dalam akaun'}</li>
         </ul>
       </div>
       <div class="auth-card">
@@ -560,7 +560,7 @@ async function dashboard() {
   const gol = saya.golongan || {};
   if (gol.tamatTempoh) tindakan.push(`<div class="row-item crit"><div class="rt"><b>Akses ${h(LABEL_GOL[gol.asal] || '')} sudah tamat</b><small><em class="crit">Masukkan kod baharu</em> · kini sebagai orang awam</small></div><a class="btn sm outline" href="#/akaun">Kod</a></div>`);
   else if (gol.tamat && bezaHari(gol.tamat, hariIniMy()) <= 7) tindakan.push(`<div class="row-item warn"><div class="rt"><b>Akses ${h(LABEL_GOL[gol.golongan])} tamat dalam ${Math.max(0, bezaHari(gol.tamat, hariIniMy()))} hari</b><small><em class="warn">Perhatian</em> · tarikh tamat ${h(tarikhMy(gol.tamat + 'T00:00:00+08:00'))}</small></div><a class="btn sm outline" href="#/akaun">Kod</a></div>`);
-  if (kunci) tindakan.push(`<div class="row-item info"><div class="rt"><b>${kunci} kuliah perlu kod kelas</b><small><em class="info">Kod</em> · masukkan kod daripada guru anda</small></div><button class="btn sm outline" data-pergi="#/akaun">Kod</button></div>`);
+  if (kunci && kodAktif()) tindakan.push(`<div class="row-item info"><div class="rt"><b>${kunci} kuliah perlu kod kelas</b><small><em class="info">Kod</em> · masukkan kod daripada guru anda</small></div><button class="btn sm outline" data-pergi="#/akaun">Kod</button></div>`);
   if (!tindakan.length) tindakan.push('<div class="row-item done"><div class="rt"><b>Tiada tindakan diperlukan</b><small><em class="done">Semua baik</em></small></div></div>');
 
   const ring = 326.7;
@@ -674,7 +674,7 @@ async function halamanCourse(slug) {
       </div>
     </div>
     <div class="lesson-grid" style="margin-top:16px">
-      <div class="lesson-main">${d.log_masuk && n && s === n ? kadSijil(d) : ''}${kadGuru(d.guru_profil)}${senaraiKuliah(d, null)}</div>
+      <div class="lesson-main">${d.log_masuk && d.ciri?.sijil && n && s === n ? kadSijil(d) : ''}${kadGuru(d.guru_profil)}${senaraiKuliah(d, null)}</div>
       ${berkunci && !saya ? `<aside class="lesson-side">${kadLogMasuk()}</aside>` : ''}
     </div>
   </div>`);
@@ -895,8 +895,12 @@ async function mainkan(s) {
 // ---------- akaun ----------
 
 // ---------- golongan: pilih semasa mendaftar, naik taraf atau sambung dengan kod ----------
+const kodAktif = () => konfig.laman.kod_aktif === 'ya';
+const sijilAktif = () => konfig.laman.sijil_aktif === 'ya';
 function kadGolongan(g) {
   const label = LABEL_GOL[g] || 'golongan tertentu';
+  if (!kodAktif()) return `<div class="panel-card kad-langganan"><span class="badge vip">${h(label.toUpperCase())}</span><h3 style="margin-top:8px">Kuliah ini untuk ${h(label)}</h3>
+    <p>Kuliah ini belum dibuka untuk umum. Hubungi guru atau admin laman untuk maklumat lanjut.</p></div>`;
   return `<div class="panel-card kad-langganan"><span class="badge vip">${h(label.toUpperCase())}</span><h3 style="margin-top:8px">Kuliah ini untuk ${h(label)}</h3>
     <p>${saya ? `Masukkan kod ${h(label.toLowerCase())} di halaman Akaun untuk membuka kandungan ini.` : `Log masuk, kemudian masukkan kod ${h(label.toLowerCase())} untuk membuka kandungan ini.`}</p>
     <div class="baris-butang"><a class="btn primary" href="${saya ? '#/akaun' : '#/masuk'}">${saya ? 'Masukkan kod' : 'Log masuk'}</a></div></div>`;
@@ -907,6 +911,7 @@ function barisGolongan() {
   if (['admin', 'guru'].includes(saya.pengguna.peranan)) return `<div class="row-item done"><div class="rt"><b>Golongan: semua kandungan</b><small>Akaun ${h(saya.pengguna.peranan)}</small></div></div>`;
   const status = g.tamatTempoh ? `Akses ${h(LABEL_GOL[g.asal] || '')} tamat pada ${h(tarikhMy(g.tamat + 'T00:00:00+08:00'))}, kini orang awam`
     : `Golongan: ${h(LABEL_GOL[g.golongan] || 'Orang awam')}${g.tamat ? ` hingga ${h(tarikhMy(g.tamat + 'T00:00:00+08:00'))}` : ''}`;
+  if (!kodAktif()) return `<div class="row-item info"><div class="rt"><b>${status}</b></div></div>`;
   return `<div class="row-item ${g.tamatTempoh ? 'crit' : 'info'}"><div class="rt"><b>${status}</b><small>Ada kod kelas daripada guru atau organisasi anda? Masukkan di bawah untuk membuka kandungan khas atau menyambung tempoh.</small></div></div>
     <div class="kod-baris" data-kod-borang><input type="text" id="kodAkaun" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Contoh: ABCD-EFGH" aria-label="Kod">
       <button type="button" class="btn outline" data-act="tebus-kod">Guna kod</button></div><div class="qa-ralat" role="alert" hidden></div>`;

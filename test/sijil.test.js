@@ -34,6 +34,7 @@ test('lib sijil: kod, nama, kelayakan', () => {
 
 test('sijil: ditolak sebelum khatam; dikeluarkan sekali; halaman pengesahan; draf tidak dikira', async () => {
   const repo = repoPalsu();
+  await repo.simpanTetapan({ sijil_aktif: 'ya' }); // ciri sijil dihidupkan untuk ujian ini (lalai sembunyi)
   const A = api(repo, await login(repo, 'utama@gmail.com'));
   const c = (await A('POST', '/api/admin/course', { tajuk: 'Asas <Fiqh>', status: 'terbit' })).badan;
   const s1 = (await A('POST', `/api/admin/course/${c.id}/subject`, { tajuk: 'S1', video: 'aaaaaaaaaaa', status: 'terbit' })).badan;

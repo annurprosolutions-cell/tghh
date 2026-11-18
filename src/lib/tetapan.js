@@ -24,6 +24,10 @@ export const MEDAN = {
   // F-15: penafian dan notis privasi. Boleh disunting admin di Tetapan laman; teks biasa, baris baharu dikekalkan.
   penafian_teks: { maks: 800, lalai: 'Kuliah di laman ini menerangkan pelbagai fahaman dan aliran sebagai bahan pendidikan dan pengetahuan. Pandangan yang dikemukakan ialah pandangan penyampai masing-masing. Rujuk rujukan yang disenaraikan dan pihak berkuasa agama negeri anda untuk keputusan hukum dan fatwa. Laman ini tidak menghukum individu. Jika anda menjumpai kandungan yang salah atau mengelirukan, sila gunakan butang Lapor.' },
   privasi_teks: { maks: 500, lalai: 'Kami mengumpul nama dan emel daripada akaun Google anda, serta kemajuan tontonan, soalan dan laporan yang anda hantar. Data ini digunakan untuk log masuk, menyimpan kemajuan, mengeluarkan sijil dan menyelia kandungan. Hanya admin boleh melihat emel anda. Untuk memadam akaun, hubungi admin laman.' },
+  // Toggle ciri (Papar / Sembunyi). Lalai: sembunyi. Sijil: butang dapatkan sijil, tab sijil dan halaman /sijil/<kod>.
+  // Kod golongan: tebus kod kelas dan kotak Guna kod. Data dan kod sedia ada tidak dipadam.
+  sijil_aktif: { maks: 5, lalai: 'tidak' },
+  kod_aktif: { maks: 5, lalai: 'tidak' },
   warna: { maks: 10, lalai: 'ungu' }, // warna tema lalai (hijau, biru, ungu, marun, arang)
 };
 export const LALAI = Object.fromEntries(Object.entries(MEDAN).map(([k, v]) => [k, v.lalai]));
@@ -52,7 +56,7 @@ export function sahkanTetapan(b) {
     if (t.length > m.maks) return { ok: false, sebab: 'terlalu-panjang', medan: k };
     if (k === 'warna' && t && !WARNA[t]) return { ok: false, sebab: 'medan-tidak-sah', medan: k };
     if (k === 'hari_sesi' && t && !(/^\d{1,3}$/.test(t) && Number(t) >= 1 && Number(t) <= 365)) return { ok: false, sebab: 'hari-sesi-tidak-sah', medan: k };
-    if (k === 'papar_peserta' && t && t !== 'ya' && t !== 'tidak') return { ok: false, sebab: 'medan-tidak-sah', medan: k };
+    if ((k === 'papar_peserta' || k === 'sijil_aktif' || k === 'kod_aktif') && t && t !== 'ya' && t !== 'tidak') return { ok: false, sebab: 'medan-tidak-sah', medan: k };
     if (k === 'emel_hubungan' && t && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t)) return { ok: false, sebab: 'emel-tidak-sah', medan: k };
     nilai[k] = t;
   }
@@ -65,6 +69,11 @@ export function gabungTetapan(baris) {
   const nilai = Object.fromEntries(Object.entries(LALAI).map(([k, l]) => [k, peta.get(k) || l]));
   const logoKunci = peta.get('logo_kunci') || null;
   return { nilai, logoKunci, logoJenis: peta.get('logo_jenis') || null };
+}
+
+// Adakah ciri ini dihidupkan? Gagal baca tetapan = sembunyi (lalai selamat).
+export async function ciriAktif(repo, kunci) {
+  try { return gabungTetapan(await repo.semuaTetapan()).nilai[kunci] === 'ya'; } catch { return false; }
 }
 
 export const urlLogo = (g) => (g.logoKunci ? `/api/logo?v=${encodeURIComponent(g.logoKunci.slice(-8))}` : null);
