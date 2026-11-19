@@ -36,4 +36,6 @@ export function urlGambarVideo(sumber, id) {
 }
 // Pautan asal (untuk borang panel) bagi sumber video dan rujukan gambar.
 export const pautanVideo = (sumber, id) => (!id ? '' : sumber === 'drive' ? `https://drive.google.com/file/d/${id}/view` : `https://youtu.be/${id}`);
-export const pautanGambar = (ref) => { const id = idDariRujukan(ref); return id ? `https://drive.google.com/file/d/${id}/view` : ''; };
+// Pautan buka fail Google Drive (nota PDF). Hanya dihantar kepada yang layak (lihat pelajar-api /api/nota/<id>).
+export const pautanFailDrive = (id) => (ID_DRIVE.test(String(id ?? '')) ? `https://drive.google.com/file/d/${id}/view` : null);
+export const pautanGambar =(ref) => { const id = idDariRujukan(ref); return id ? `https://drive.google.com/file/d/${id}/view` : ''; };

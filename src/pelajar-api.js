@@ -9,7 +9,7 @@ import { kepalaKandungan } from './lib/nota.js';
 import { golonganEfektif, keterlihatan, normalKod, kodBolehGuna, tamatSelepasTebus, LABEL } from './lib/golongan.js';
 import { perananPenuh } from './lib/peranan.js';
 import { ciriAktif } from './lib/tetapan.js';
-import { urlGambar, urlGambarVideo } from './lib/media.js';
+import { urlGambar, urlGambarVideo, pautanFailDrive } from './lib/media.js';
 import { kodSijil, sahkanNamaSijil, layakSijil } from './lib/sijil.js';
 import { sahkanSoalan, namaPertama, awalHari, HAD_SEHARI } from './lib/soalan.js';
 import { sahkanLaporan, HAD_LAPORAN_SEHARI } from './lib/laporan.js';
@@ -152,7 +152,7 @@ export async function pelajarApi(req, env, url, repo, now) {
     // Nama nota hanya untuk yang layak DAN sudah log masuk. Kunci R2 tidak pernah dihantar. Jika jadual nota
     // belum dicipta, halaman kuliah tetap berfungsi tanpa nota.
     let nota = [];
-    try { nota = (await repo.senaraiNota(t.s.id)).map(({ id, nama, saiz }) => ({ id, nama, saiz })); } catch { /* jadual atau lajur belum wujud */ }
+    try { nota = (await repo.senaraiNota(t.s.id)).map(({ id, nama, saiz, sumber }) => ({ id, nama, saiz, sumber })); } catch { /* jadual atau lajur belum wujud */ }
     // Soal jawab: bilangan sentiasa diberi; senarai dijawab untuk sesiapa yang layak menonton (pelawat pada kuliah percuma boleh membaca);
     // soalan menunggu hanya milik pengguna sendiri. Nama penanya hanya nama pertama. Jika jadual belum wujud: kosong.
     let soalan = { bil: 0, awam: [], menunggu: [], had: HAD_SEHARI };
@@ -274,6 +274,10 @@ export async function pelajarApi(req, env, url, repo, now) {
     const keputusan = keputusanSubject({ course: t.c, subject: t.s, logMasuk, golongan: k.golongan });
     if (!logMasuk) return json({ ralat: 'belum-log-masuk' }, 401);
     if (!keputusan.akses) return json({ ralat: 'tiada-akses' }, 403);
+    if (n.sumber === 'drive') { // nota pautan Drive: pautan hanya diberi selepas semua semakan di atas
+      const pautan = pautanFailDrive(n.drive_id);
+      return pautan ? new Response(null, { status: 302, headers: { location: pautan, 'cache-control': 'private, no-store' } }) : json({ ralat: 'tidak-dijumpai' }, 404);
+    }
     if (!env.NOTA) return json({ ralat: 'r2-belum-sedia' }, 503);
     const obj = await env.NOTA.get(n.kunci);
     if (!obj) return json({ ralat: 'tidak-dijumpai' }, 404);

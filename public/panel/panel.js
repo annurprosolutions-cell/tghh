@@ -108,7 +108,10 @@ const RALAT = {
   'fail-terlalu-besar': 'Fail terlalu besar. Maksimum 20 MB.',
   'fail-kosong': 'Fail kosong.',
   'had-nota': 'Setiap kuliah maksimum 10 nota. Padam nota lama dahulu.',
-  'r2-belum-sedia': 'Storan fail (R2) belum disambungkan pada Worker.',
+  'r2-belum-sedia': 'Storan fail (R2) belum disambungkan pada Worker. Guna "Tambah pautan Google Drive" untuk nota PDF.',
+  'pautan-drive-tidak-sah': 'Pautan tidak sah. Tampal pautan fail Google Drive (https://drive.google.com/file/d/.../view). Folder tak boleh digunakan.',
+  'nama-diperlukan': 'Nama nota wajib diisi.',
+  'nota-pendua': 'Pautan Drive ini sudah ditambah pada kuliah ini.',
   'golongan-tidak-sah': 'Pilih golongan.',
   'hari-sesi-tidak-sah': 'Tempoh log masuk mesti 1 hingga 365 hari.',
   'tidak-boleh-sekat': 'Tidak boleh menyekat akaun sendiri atau admin utama.',
@@ -346,7 +349,7 @@ async function halamanKelulusan() {
       <table class="beza"><thead><tr><th>Medan</th><th>Sekarang</th><th>Dicadangkan</th></tr></thead><tbody>
       ${Object.keys(k.perubahan).map((m) => `<tr><td>${NAMA_MEDAN[m] || h(m)}</td><td>${nilaiMedan(m, k.semasa[m], k.semasa.video_sumber ?? k.perubahan.video_sumber)}</td><td>${nilaiMedan(m, k.perubahan[m], k.perubahan.video_sumber ?? k.semasa.video_sumber)}</td></tr>`).join('')}
       </tbody></table>${butangKelulusan('perubahan', k.id)}</div>`)}
-    ${bahagian('Nota PDF', q.nota, (n) => `<div class="kad"><b>${h(n.nama)}</b> <span class="kecil">${saizTeks(n.saiz)}</span>
+    ${bahagian('Nota PDF', q.nota, (n) => `<div class="kad"><b>${h(n.nama)}</b> <span class="kecil">${n.sumber === 'drive' ? 'Google Drive' : saizTeks(n.saiz)}</span>
       <div class="kecil">${h(n.course_tajuk)} · ${h(n.subject_tajuk)} · Guru: ${h(n.guru_nama || '-')} · <a href="/api/admin/nota/${n.id}" target="_blank" rel="noopener">Buka PDF</a></div>${butangKelulusan('nota', n.id)}</div>`)}`;
 }
 
@@ -823,11 +826,19 @@ async function segarNota(sid, ralat) {
   try { senarai = await api('GET', `subject/${sid}/nota`); } catch (e) { ralat = ralat || e.message; }
   kad.innerHTML = `<h2>Nota PDF</h2>
     <div class="ralat" ${ralat ? '' : 'hidden'}>${h(ralat || '')}</div>
-    ${senarai.length ? senarai.map((n) => `<div class="baris antara" style="margin:0 0 8px"><span><b>${h(n.nama)}</b> <span class="kecil">${saizTeks(n.saiz)}</span> ${n.status === 'menunggu' ? lencanaStatus('menunggu') : ''}</span>
+    ${senarai.length ? senarai.map((n) => `<div class="baris antara" style="margin:0 0 8px"><span><b>${h(n.nama)}</b> <span class="kecil">${n.sumber === 'drive' ? 'Google Drive' : saizTeks(n.saiz)}</span> ${n.status === 'menunggu' ? lencanaStatus('menunggu') : ''}</span>
       ${ADMIN() || n.status === 'menunggu' ? `<button type="button" class="bahaya" data-act="padam-nota" data-subject="${sid}" data-id="${n.id}">${ADMIN() ? 'Padam' : 'Tarik balik'}</button>` : ''}</div>`).join('') : '<p class="kecil">Belum ada nota.</p>'}
-    <label for="failNota">Muat naik nota (PDF, maksimum 20 MB, sehingga 10 nota)</label>
+    <h3 style="margin:18px 0 6px;font-size:15px">Tambah pautan Google Drive</h3>
+    <label for="namaNotaDrive">Nama nota</label>
+    <input type="text" id="namaNotaDrive" maxlength="100" placeholder="Contoh: Slaid Kuliah 1">
+    <label for="pautanNotaDrive">Pautan fail PDF di Google Drive</label>
+    <input type="url" id="pautanNotaDrive" placeholder="https://drive.google.com/file/d/…/view">
+    <div class="bantuan">Di Drive: klik kanan fail PDF, <b>Share</b>, tetapkan <b>Anyone with the link</b> (Viewer), <b>Copy link</b> dan tampal di sini. Folder tak boleh. Sesiapa yang ada pautan Drive boleh membuka fail itu terus.</div>
+    <div class="baris" style="margin:8px 0 0"><button type="button" data-act="tambah-nota-drive" data-subject="${sid}">Tambah pautan</button></div>
+    <h3 style="margin:18px 0 6px;font-size:15px">Atau muat naik fail</h3>
+    <label for="failNota">Muat naik nota (PDF, maksimum 20 MB, sehingga 10 nota; memerlukan storan R2)</label>
     <input type="file" id="failNota" accept="application/pdf,.pdf" multiple data-nota-fail data-subject="${sid}">
-    <div class="bantuan" id="statusNota">${ADMIN() ? '' : 'Nota yang dimuat naik dipaparkan kepada pelajar selepas admin meluluskan. '}Pelajar hanya boleh muat turun jika layak menonton kuliah ini dan sudah log masuk.</div>`;
+    <div class="bantuan" id="statusNota">${ADMIN() ? '' : 'Nota yang ditambah dipaparkan kepada pelajar selepas admin meluluskan. '}Pelajar hanya boleh membuka nota jika layak menonton kuliah ini dan sudah log masuk.</div>`;
 }
 
 document.addEventListener('change', async (e) => {
@@ -1051,6 +1062,14 @@ const TINDAKAN = {
     if (!confirm('Buang logo? Ikon lalai akan digunakan semula.')) return;
     const d = await api('DELETE', 'tetapan/logo');
     paparLogo(d.logo);
+  },
+  async 'tambah-nota-drive'(el) {
+    const sid = el.dataset.subject;
+    const nama = document.getElementById('namaNotaDrive')?.value.trim() || '';
+    const pautan = document.getElementById('pautanNotaDrive')?.value.trim() || '';
+    el.disabled = true;
+    try { await api('POST', `subject/${sid}/nota`, { nama, pautan }); } catch (e) { el.disabled = false; if (e.status === 401) return mula(); return segarNota(sid, e.message); }
+    segarNota(sid);
   },
   async 'padam-nota'(el) {
     if (!confirm('Padam nota ini?')) return;

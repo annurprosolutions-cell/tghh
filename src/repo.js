@@ -341,19 +341,23 @@ export function repoD1(db) {
     // ---- nota PDF (metadata; fail dalam R2) ----
     // Lalai: nota terbit sahaja (untuk pelajar). Panel memakai termasukMenunggu.
     async senaraiNota(subjectId, { termasukMenunggu = false } = {}) {
-      return (await db.prepare(`SELECT id, nama, saiz, status FROM nota WHERE subject_id = ? ${termasukMenunggu ? '' : `AND status = 'terbit'`} ORDER BY id`).bind(subjectId).all()).results;
+      return (await db.prepare(`SELECT id, nama, saiz, status, sumber FROM nota WHERE subject_id = ? ${termasukMenunggu ? '' : `AND status = 'terbit'`} ORDER BY id`).bind(subjectId).all()).results;
+    },
+    async adaNotaDrive(subjectId, driveId) {
+      return !!(await db.prepare(`SELECT 1 AS a FROM nota WHERE subject_id = ? AND sumber = 'drive' AND drive_id = ?`).bind(subjectId, driveId).first());
     },
     tetapkanStatusNota: (id, status) => jalan('UPDATE nota SET status = ? WHERE id = ?', status, id),
     async notaMenunggu() {
-      return (await db.prepare(`SELECT n.id, n.nama, n.saiz, n.subject_id, s.tajuk AS subject_tajuk, s.course_id, c.tajuk AS course_tajuk, c.guru_emel
+      return (await db.prepare(`SELECT n.id, n.nama, n.saiz, n.sumber, n.subject_id, s.tajuk AS subject_tajuk, s.course_id, c.tajuk AS course_tajuk, c.guru_emel
         FROM nota n JOIN subject s ON s.id = n.subject_id JOIN course c ON c.id = s.course_id WHERE n.status = 'menunggu' ORDER BY n.id`).all()).results;
     },
     async kunciNota(subjectId) {
-      return (await db.prepare('SELECT kunci FROM nota WHERE subject_id = ?').bind(subjectId).all()).results.map((r) => r.kunci);
+      // Hanya fail dalam R2; nota pautan Drive tiada objek untuk dipadam.
+      return (await db.prepare(`SELECT kunci FROM nota WHERE subject_id = ? AND sumber = 'r2'`).bind(subjectId).all()).results.map((r) => r.kunci);
     },
     notaDariId: (id) => satu('SELECT * FROM nota WHERE id = ?', id),
     async ciptaNota(subjectId, n, masa) {
-      const r = await jalan('INSERT INTO nota (subject_id, nama, kunci, saiz, status, dicipta_pada) VALUES (?, ?, ?, ?, ?, ?)', subjectId, n.nama, n.kunci, n.saiz, n.status ?? 'terbit', masa);
+      const r = await jalan('INSERT INTO nota (subject_id, nama, kunci, saiz, status, dicipta_pada, sumber, drive_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', subjectId, n.nama, n.kunci, n.saiz, n.status ?? 'terbit', masa, n.sumber ?? 'r2', n.drive_id ?? null);
       return satu('SELECT * FROM nota WHERE id = ?', r.meta.last_row_id);
     },
     padamNota: (id) => jalan('DELETE FROM nota WHERE id = ?', id),

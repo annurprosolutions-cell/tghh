@@ -23,6 +23,17 @@ Medan **Pautan video** menerima kedua-dua jenis, dan sumbernya dikesan sendiri:
 - Drive bukan platform video: video besar yang ditonton ramai boleh dikenakan had oleh Google (mesej "terlalu ramai pengguna"). Untuk trafik besar, YouTube lebih stabil.
 - Sesiapa yang ada pautan Drive atau YouTube boleh menontonnya terus. Sistem hanya menghantar ID video kepada pengguna yang layak.
 
+### Nota PDF (pautan Google Drive)
+
+Nota PDF kini boleh ditambah **tanpa storan R2**, menggunakan pautan fail Google Drive:
+1. Di Drive, klik kanan fail PDF, **Share**, tetapkan **Anyone with the link** (Viewer), **Copy link**.
+2. Di panel, buka kuliah (Siri, pilih siri, **Sunting** kuliah), turun ke kad **Nota PDF**, bahagian **Tambah pautan Google Drive**. Isi **Nama nota** dan tampal pautan, kemudian **Tambah pautan**.
+3. Setiap kuliah maksimum 10 nota. Pautan yang sama tak boleh ditambah dua kali. Folder tak diterima.
+4. Pelajar yang sudah log masuk dan layak menonton kuliah itu nampak nota dalam tab **Nota PDF** (label "Google Drive · PDF"). Menekan **Buka** menghantar mereka ke Drive. Pelawat hanya nampak bilangan nota.
+5. Guru boleh menambah nota, tetapi ia menunggu kelulusan admin (tab **Kelulusan**, pautan **Buka PDF** untuk semak).
+
+**Had:** sesiapa yang ada pautan Drive boleh membuka fail itu terus, dan pelajar boleh kongsi pautan itu. Sistem hanya menyembunyikan pautan daripada pelawat dan pelajar yang tak layak. Jangan guna untuk nota yang perlu dirahsiakan. Muat naik fail terus ke laman masih memerlukan R2 (belum diaktifkan); bila R2 diaktifkan, kedua-dua cara boleh digunakan serentak.
+
 ### Gambar thumbnail dan gambar guru
 
 - **Thumbnail siri** (borang Siri) dan **thumbnail kuliah** (borang Kuliah): tampal pautan fail gambar Google Drive (perkongsian **Anyone with the link**). Kosongkan untuk guna gambar automatik daripada video.
@@ -54,7 +65,7 @@ Di **Tetapan laman**, dua pilihan **Papar** atau **Sembunyi**:
 
 ## 6. Perkara yang belum dibuat
 
-- **Storan R2 (nota PDF, logo, gambar artikel, sandaran harian)** belum didaftar. Ciri ni dimatikan. Sandaran manual: `wrangler d1 export` oleh pembangun, sebelum perubahan besar dan sekurang-kurangnya sebulan sekali.
+- **Storan R2 (muat naik nota PDF, logo, gambar artikel, sandaran harian)** belum didaftar. Ciri ni dimatikan. Nota PDF boleh guna pautan Google Drive sebagai ganti (lihat bahagian 1). Sandaran manual: `wrangler d1 export` oleh pembangun, sebelum perubahan besar dan sekurang-kurangnya sebulan sekali.
 - **Dasar privasi** ada di `/privasi` (dihidang dari server, nama laman dan emel hubungan dari Tetapan laman). Isi **Emel hubungan** di Tetapan laman, dan semak teksnya sebelum lancar.
 - **Google OAuth** masih mod Testing. Pengguna biasa belum boleh log masuk sehingga ditukar ke Production (lihat bahagian 7).
 - Kandungan ujian dalam panel: **"Ujian: Pengenalan Aliran"** dan **"Kuliah 2"** masih ada. Padam bila dah tak perlu.
@@ -81,7 +92,7 @@ Di **Tetapan laman**, dua pilihan **Papar** atau **Sembunyi**:
 
 ## Lampiran: keputusan QA (IPD seksyen 6)
 
-Semua ujian automatik dijalankan dengan `npm test`, `npm run test:d1` dan `npm run test:e2e` (130 unit, 27 SQL, 71 e2e pelayar termasuk telefon 390px). Status "manual" bermaksud perlu semakan di telefon atau akaun sebenar.
+Semua ujian automatik dijalankan dengan `npm test`, `npm run test:d1` dan `npm run test:e2e` (155 unit, 32 SQL, 85 e2e pelayar termasuk telefon 390px). Status "manual" bermaksud perlu semakan di telefon atau akaun sebenar.
 
 | Ujian | Cara | Status |
 |---|---|---|

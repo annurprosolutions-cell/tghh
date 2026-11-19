@@ -11,6 +11,14 @@ export function namaNota(mentah) {
   return /\.pdf$/i.test(n) ? n : n + '.pdf';
 }
 
+// Nama paparan untuk nota pautan Drive: sama seperti namaNota tetapi .pdf tidak dipaksa (Drive tidak boleh disemak)
+// dan nama kosong ditolak (null) supaya pengguna memberi nama yang bermakna.
+export function namaNotaDrive(mentah) {
+  let n = String(mentah ?? '').replace(/[\u0000-\u001f\u007f]/g, '').split(/[\\/]/).pop().trim();
+  if (n.length > 100) n = n.slice(0, 100).trim();
+  return n || null;
+}
+
 // Fail PDF sebenar bermula dengan "%PDF-". Pengepala Content-Type boleh dipalsukan, jadi semak kandungan.
 export function adaPdf(bait) {
   const u = new Uint8Array(bait, 0, Math.min(5, bait.byteLength));

@@ -14,7 +14,8 @@ import { sahkanJawapan } from './lib/soalan.js';
 import { sahkanKemaskiniLaporan, STATUS_LAPORAN } from './lib/laporan.js';
 import { sahkanKodBaru, kodBaru, paparKod } from './lib/golongan.js';
 import { buatSandaran, senaraiSandaran, namaSandaranSah, AWALAN } from './sandaran.js';
-import { MAKS_SAIZ, MAKS_SETIAP_SUBJECT, namaNota, adaPdf, kunciBaru } from './lib/nota.js';
+import { MAKS_SAIZ, MAKS_SETIAP_SUBJECT, namaNota, namaNotaDrive, adaPdf, kunciBaru } from './lib/nota.js';
+import { ekstrakIdDrive, pautanFailDrive } from './lib/media.js';
 
 const MAKS_BADAN = 50_000;
 const MAKS_MEDIA = 2 * 1024 * 1024; // selepas dikecilkan di pelayar, gambar biasanya < 300 KB
@@ -376,7 +377,7 @@ export async function adminApi(req, env, url, repo, now) {
         const n = await repo.notaDariId(kid);
         if (!n || n.status !== 'menunggu') return json({ ralat: 'tidak-dijumpai' }, 404);
         if (tindakan === 'lulus') await repo.tetapkanStatusNota(kid, 'terbit');
-        else { await repo.padamNota(kid); if (env.NOTA) await env.NOTA.delete(n.kunci).catch(() => {}); }
+        else { await repo.padamNota(kid); if (env.NOTA && n.sumber !== 'drive') await env.NOTA.delete(n.kunci).catch(() => {}); }
         return json({ ok: true });
       }
     }
@@ -580,6 +581,19 @@ export async function adminApi(req, env, url, repo, now) {
     const semua = () => repo.senaraiNota(id, { termasukMenunggu: true });
     if (req.method === 'GET') return json(await semua());
     if (req.method !== 'POST') return json({ ralat: 'kaedah-tidak-disokong' }, 405);
+    // Pautan fail Google Drive (JSON { nama, pautan }): tanpa R2. Pelajar menerima pautan hanya melalui /api/nota/<id>
+    // selepas semakan akses. Sesiapa yang ada pautan Drive boleh membukanya terus (sama seperti video Drive).
+    if ((req.headers.get('content-type') || '').includes('application/json')) {
+      const b = await bacaJson(req, 2000); if (b.gagal) return b.gagal;
+      const idDrive = ekstrakIdDrive(b.nilai?.pautan);
+      if (!idDrive) return json({ ralat: 'pautan-drive-tidak-sah', medan: 'pautan' }, 400);
+      const nama = namaNotaDrive(b.nilai?.nama);
+      if (!nama) return json({ ralat: 'nama-diperlukan', medan: 'nama' }, 400);
+      if ((await semua()).length >= MAKS_SETIAP_SUBJECT) return json({ ralat: 'had-nota' }, 409);
+      if (await repo.adaNotaDrive(id, idDrive)) return json({ ralat: 'nota-pendua', medan: 'pautan' }, 409);
+      const n = await repo.ciptaNota(id, { nama, kunci: `drive/${id}/${idDrive}`, saiz: 0, sumber: 'drive', drive_id: idDrive, status: admin ? 'terbit' : 'menunggu' }, masa);
+      return json({ id: n.id, nama: n.nama, saiz: 0, sumber: 'drive', status: n.status }, 201);
+    }
     if (!env.NOTA) return json({ ralat: 'r2-belum-sedia' }, 503);
     if (!(req.headers.get('content-type') || '').startsWith('application/pdf')) return json({ ralat: 'bukan-pdf' }, 415);
     if (Number(req.headers.get('content-length') || 0) > MAKS_SAIZ) return json({ ralat: 'fail-terlalu-besar' }, 413);
@@ -592,7 +606,7 @@ export async function adminApi(req, env, url, repo, now) {
     await env.NOTA.put(kunci, bait, { httpMetadata: { contentType: 'application/pdf' } });
     try {
       const n = await repo.ciptaNota(id, { nama: namaNota(url.searchParams.get('nama')), kunci, saiz: bait.byteLength, status: admin ? 'terbit' : 'menunggu' }, masa);
-      return json({ id: n.id, nama: n.nama, saiz: n.saiz, status: n.status }, 201);
+      return json({ id: n.id, nama: n.nama, saiz: n.saiz, sumber: 'r2', status: n.status }, 201);
     } catch (e) {
       await env.NOTA.delete(kunci).catch(() => {}); // jangan tinggalkan fail tanpa rekod
       throw e;
@@ -605,6 +619,10 @@ export async function adminApi(req, env, url, repo, now) {
     if (!n || !(await subjectSaya(n.subject_id))) return json({ ralat: 'tidak-dijumpai' }, 404);
     if (req.method === 'GET') {
       // Admin/pemilik menyemak PDF (termasuk yang belum diluluskan) sebelum keputusan.
+      if (n.sumber === 'drive') {
+        const pautan = pautanFailDrive(n.drive_id);
+        return pautan ? new Response(null, { status: 302, headers: { location: pautan, 'cache-control': 'private, no-store' } }) : json({ ralat: 'tidak-dijumpai' }, 404);
+      }
       const obj = env.NOTA ? await env.NOTA.get(n.kunci) : null;
       if (!obj) return json({ ralat: 'tidak-dijumpai' }, 404);
       return new Response(obj.body, { headers: { 'content-type': 'application/pdf', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } });
@@ -612,7 +630,7 @@ export async function adminApi(req, env, url, repo, now) {
     if (req.method !== 'DELETE') return json({ ralat: 'kaedah-tidak-disokong' }, 405);
     if (!admin && n.status !== 'menunggu') return json({ ralat: 'perlu-kelulusan' }, 403); // guru hanya menarik balik yang belum lulus
     await repo.padamNota(id);
-    if (env.NOTA) await env.NOTA.delete(n.kunci).catch(() => {});
+    if (env.NOTA && n.sumber !== 'drive') await env.NOTA.delete(n.kunci).catch(() => {});
     return json({ ok: true });
   }
 

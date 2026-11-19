@@ -172,7 +172,7 @@ test('nota guru menunggu kelulusan: pelajar tidak nampak sehingga lulus; tolak m
   await A('POST', `/api/admin/kelulusan/nota/${n2.id}/tolak`, { catatan: 'Salah fail' });
   assert.equal(e.NOTA._objek.size, 1);
   d = (await P('GET', `/api/subject/${s.id}`)).b;
-  assert.deepEqual(d.nota, [{ id: n1.id, nama: 'a.pdf', saiz: PDF.length }]);
+  assert.deepEqual(d.nota, [{ id: n1.id, nama: 'a.pdf', saiz: PDF.length, sumber: 'r2' }]);
   assert.equal((await P('GET', `/api/nota/${n1.id}`)).status, 200);
   // guru tidak boleh padam nota yang sudah lulus; nota admin terus terbit
   assert.equal((await G1('DELETE', `/api/admin/nota/${n1.id}`)).status, 403);

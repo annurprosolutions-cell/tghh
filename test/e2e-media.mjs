@@ -272,6 +272,48 @@ try {
     await g.ctx.close();
   });
 
+  await langkah('nota PDF pautan Drive: admin tambah di panel (pautan palsu, folder dan pendua ditolak); pelajar nampak "Google Drive", pautan dialih ke Drive; ID tak bocor dalam halaman', async () => {
+    const NOTA_ID = '1NoTaPdFdRiVeIdNoTaPdFdRiVe123456';
+    await ap.goto(B + `/panel/#/course/${a.id}/subject/${aS2.id}`);
+    await ap.locator('#kad-nota').getByText('Tambah pautan Google Drive').waitFor();
+    const tambah = ap.getByRole('button', { name: 'Tambah pautan' });
+    await ap.locator('#namaNotaDrive').fill('Slaid Kuliah 1');
+    await ap.locator('#pautanNotaDrive').fill('https://drive.google.com/drive/folders/' + NOTA_ID);
+    await tambah.click();
+    await ap.getByText('Pautan tidak sah. Tampal pautan fail Google Drive').waitFor();
+    await ap.locator('#namaNotaDrive').fill('Slaid Kuliah 1');
+    await ap.locator('#pautanNotaDrive').fill(pautanDrive(NOTA_ID));
+    await skrin(ap, 'm7-panel-nota-drive');
+    await ap.getByRole('button', { name: 'Tambah pautan' }).click();
+    await ap.locator('#kad-nota').getByText('Slaid Kuliah 1').waitFor();
+    await ap.locator('#kad-nota').getByText('Google Drive', { exact: true }).waitFor();
+    // pautan sama sekali lagi ditolak
+    await ap.locator('#namaNotaDrive').fill('Salinan');
+    await ap.locator('#pautanNotaDrive').fill(NOTA_ID);
+    await ap.getByRole('button', { name: 'Tambah pautan' }).click();
+    await ap.getByText('Pautan Drive ini sudah ditambah pada kuliah ini.').waitFor();
+
+    // pelajar: tab Nota PDF, label Google Drive, pautan melalui /api/nota/<id>; ID Drive tiada dalam DOM
+    await pp.goto(B + `/#/subject/${aS2.id}`);
+    await pp.locator('[data-tab=nota]').click();
+    const baris = pp.locator('.nota-row', { hasText: 'Slaid Kuliah 1' });
+    await baris.waitFor();
+    await baris.getByText('Google Drive · PDF').waitFor();
+    const href = await baris.getAttribute('href');
+    assert.match(href, /^\/api\/nota\/\d+$/);
+    assert.ok(!(await pp.content()).includes(NOTA_ID), 'ID Drive nota bocor dalam DOM');
+    const r = await pp.request.get(B + href, { maxRedirects: 0 });
+    assert.equal(r.status(), 302);
+    assert.equal(r.headers().location, `https://drive.google.com/file/d/${NOTA_ID}/view`);
+    // pelawat: bilangan nota dipapar, senarai dan pautan tidak; pautan terus ditolak (401)
+    await pv.goto(B + `/#/subject/${aS2.id}`);
+    await pv.locator('[data-tab=nota]').click();
+    await pv.getByText('1 nota PDF').first().waitFor();
+    assert.ok(!(await pv.content()).includes(NOTA_ID));
+    assert.equal((await pv.request.get(B + href, { maxRedirects: 0 })).status(), 401);
+    await skrin(pp, 'm7-pelajar-nota-drive');
+  });
+
   await langkah('tiada ralat JavaScript', async () => { assert.deepEqual(ralatHalaman, []); });
 
   console.log(`\n# lulus ${lulus}`);

@@ -809,7 +809,7 @@ async function segarSoalan(id) {
 
 function paparNota(d, s) {
   if (d.nota.length) return `<div class="nota-senarai">${d.nota.map((n) => `<a class="nota-row" href="/api/nota/${n.id}" target="_blank" rel="noopener">
-      <span class="nota-ikon">${IKON_PDF}</span><span class="nota-nama">${h(n.nama)}<small>${saizTeks(n.saiz)} · PDF</small></span><span class="nota-buka">Buka</span></a>`).join('')}</div>`;
+      <span class="nota-ikon">${IKON_PDF}</span><span class="nota-nama">${h(n.nama)}<small>${n.sumber === 'drive' ? 'Google Drive · PDF' : `${saizTeks(n.saiz)} · PDF`}</small></span><span class="nota-buka">Buka</span></a>`).join('')}</div>`;
   if (!d.log_masuk) return `<p class="kosong-nota">${d.bil_nota} nota PDF untuk kuliah ini. <a href="#/masuk">Log masuk</a> untuk muat turun.</p>`;
   return `<p class="kosong-nota">${d.bil_nota} nota PDF disediakan untuk kuliah ini. Log masuk untuk memuat turun.</p>`;
 }

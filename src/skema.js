@@ -91,6 +91,11 @@ export const LANGKAH = [
     `ALTER TABLE subject ADD COLUMN thumbnail TEXT`,
     `ALTER TABLE guru ADD COLUMN gambar TEXT`,
   ],
+  // ---- versi 4: nota PDF boleh berupa pautan fail Google Drive (sumber 'drive', tanpa R2). Kunci unik dijana: drive/<subject>/<ID>, saiz 0 ----
+  [
+    `ALTER TABLE nota ADD COLUMN sumber TEXT NOT NULL DEFAULT 'r2'`,
+    `ALTER TABLE nota ADD COLUMN drive_id TEXT`,
+  ],
 ];
 
 let sedia = false; // sekali bagi setiap isolate Worker

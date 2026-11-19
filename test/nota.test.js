@@ -135,7 +135,7 @@ test('pelajar: nota hanya untuk yang sudah log masuk; pelawat ditolak', async ()
   const lihat = async (M) => (await M('GET', `/api/subject/${s.biasa.id}`)).text();
   for (const M of [pelawat, ahli]) assert.ok(!(await lihat(M)).includes('nota/'));
   assert.deepEqual([JSON.parse(await lihat(pelawat)).bil_nota, JSON.parse(await lihat(pelawat)).nota], [1, []]);
-  assert.deepEqual(JSON.parse(await lihat(ahli)).nota, [{ id: nota.id, nama: 'nota bab 1.pdf', saiz: PDF.length }]);
+  assert.deepEqual(JSON.parse(await lihat(ahli)).nota, [{ id: nota.id, nama: 'nota bab 1.pdf', saiz: PDF.length, sumber: 'r2' }]);
   // senarai subject dalam halaman course tidak membawa nota
   assert.ok(!(await (await ahli('GET', '/api/course/fiqh')).text()).includes('nota'));
 });
@@ -167,4 +167,99 @@ test('fail hilang daripada R2 memberi 404, bukan ralat pelayan', async () => {
   const n = await (await muat(A, s.percuma.id)).json();
   env.NOTA._objek.clear();
   assert.equal((await minta(repo, env, await sesi(repo, 'biasa@gmail.com'))('GET', `/api/nota/${n.id}`)).status, 404);
+});
+
+// ---------------- nota pautan Google Drive (tanpa R2) ----------------
+const ID_D = '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO';
+const PAUTAN_D = `https://drive.google.com/file/d/${ID_D}/view?usp=drive_link`;
+const drive = (M, sid, badan) => M('POST', `/api/admin/subject/${sid}/nota`, { badan: JSON.stringify(badan), header: { 'content-type': 'application/json' } });
+
+test('nama nota Drive: .pdf tidak dipaksa, nama kosong ditolak', async () => {
+  const { namaNotaDrive } = await import('../src/lib/nota.js');
+  assert.equal(namaNotaDrive('  Slaid Kuliah 1 '), 'Slaid Kuliah 1');
+  assert.equal(namaNotaDrive('C:\\x\\Nota.pdf'), 'Nota.pdf');
+  assert.equal(namaNotaDrive('  \u0000 '), null);
+  assert.equal(namaNotaDrive(undefined), null);
+  assert.equal(namaNotaDrive('x'.repeat(300)).length, 100);
+});
+
+test('admin: tambah nota pautan Drive tanpa R2, senarai, dan padam (tiada panggilan R2)', async () => {
+  const { repo, env, s } = await sedia();
+  const A = minta(repo, { ...env, NOTA: undefined }, await sesi(repo, 'ustaz@gmail.com'));
+  const r = await drive(A, s.biasa.id, { nama: 'Slaid Kuliah 1', pautan: PAUTAN_D });
+  assert.equal(r.status, 201);
+  const n = await r.json();
+  assert.deepEqual([n.nama, n.saiz, n.sumber, n.status], ['Slaid Kuliah 1', 0, 'drive', 'terbit']);
+  assert.deepEqual(await (await A('GET', `/api/admin/subject/${s.biasa.id}/nota`)).json(), [n]);
+  assert.equal((await A('DELETE', `/api/admin/nota/${n.id}`)).status, 200);
+  assert.deepEqual(await (await A('GET', `/api/admin/subject/${s.biasa.id}/nota`)).json(), []);
+});
+
+test('nota Drive: pautan tidak sah, folder, hos lain, nama kosong, pendua, had 10 dan JSON rosak ditolak', async () => {
+  const { repo, env, s } = await sedia();
+  const A = minta(repo, env, await sesi(repo, 'ustaz@gmail.com'));
+  const id = s.biasa.id;
+  for (const pautan of ['', 'bukan pautan', 'https://drive.google.com/drive/folders/' + ID_D, 'https://jahat.test/file/d/' + ID_D + '/view', 'https://youtu.be/dQw4w9WgXcQ']) {
+    const r = await drive(A, id, { nama: 'N', pautan });
+    assert.equal(r.status, 400, pautan); assert.deepEqual(await r.json(), { ralat: 'pautan-drive-tidak-sah', medan: 'pautan' });
+  }
+  assert.deepEqual(await (await drive(A, id, { nama: '  ', pautan: PAUTAN_D })).json(), { ralat: 'nama-diperlukan', medan: 'nama' });
+  assert.equal((await drive(A, id, { nama: 'A', pautan: PAUTAN_D })).status, 201);
+  assert.deepEqual(await (await drive(A, id, { nama: 'B', pautan: ID_D })).json(), { ralat: 'nota-pendua', medan: 'pautan' }); // ID sama, bentuk lain
+  assert.equal((await A('POST', `/api/admin/subject/${id}/nota`, { badan: '{rosak', header: { 'content-type': 'application/json' } })).status, 400);
+  assert.equal((await A('POST', `/api/admin/subject/${id}/nota`, { badan: JSON.stringify({ nama: 'x'.repeat(3000), pautan: PAUTAN_D }), header: { 'content-type': 'application/json' } })).status, 413);
+  for (let i = 0; i < 9; i++) assert.equal((await drive(A, id, { nama: 'N' + i, pautan: 'A'.repeat(19) + String(i).padStart(2, '0') + 'x'.repeat(1) })).status, 201);
+  assert.equal((await drive(A, id, { nama: 'lebih', pautan: 'Z'.repeat(25) })).status, 409);
+});
+
+test('nota Drive: pelajar biasa 403, tanpa sesi 401, asal lain 403, subject tiada 404', async () => {
+  const { repo, env, s } = await sedia();
+  assert.equal((await drive(minta(repo, env, null), s.biasa.id, { nama: 'N', pautan: PAUTAN_D })).status, 401);
+  assert.equal((await drive(minta(repo, env, await sesi(repo, 'pelajar@gmail.com')), s.biasa.id, { nama: 'N', pautan: PAUTAN_D })).status, 403);
+  const A = minta(repo, env, await sesi(repo, 'ustaz@gmail.com'));
+  assert.equal((await drive(A, 9999, { nama: 'N', pautan: PAUTAN_D })).status, 404);
+  assert.equal((await A('POST', `/api/admin/subject/${s.biasa.id}/nota`, { badan: JSON.stringify({ nama: 'N', pautan: PAUTAN_D }), header: { 'content-type': 'application/json', origin: 'https://jahat.test' } })).status, 403);
+});
+
+test('pelajar: nota Drive dialih (302) ke Drive hanya selepas log masuk dan layak; pautan tak bocor dalam senarai', async () => {
+  const { repo, env, s } = await sedia();
+  const A = minta(repo, env, await sesi(repo, 'ustaz@gmail.com'));
+  const n = await (await drive(A, s.biasa.id, { nama: 'Slaid', pautan: PAUTAN_D })).json();
+  const pelawat = minta(repo, env, null), ahli = minta(repo, env, await sesi(repo, 'pelajar@gmail.com'));
+  assert.equal((await pelawat('GET', `/api/nota/${n.id}`)).status, 401);
+  const r = await ahli('GET', `/api/nota/${n.id}`);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `https://drive.google.com/file/d/${ID_D}/view`);
+  assert.equal(r.headers.get('cache-control'), 'private, no-store');
+  const lihat = async (M) => (await M('GET', `/api/subject/${s.biasa.id}`)).text();
+  assert.ok(!(await lihat(pelawat)).includes(ID_D) && !(await lihat(ahli)).includes(ID_D), 'ID Drive tidak boleh ada dalam butiran kuliah');
+  assert.deepEqual(JSON.parse(await lihat(ahli)).nota, [{ id: n.id, nama: 'Slaid', saiz: 0, sumber: 'drive' }]);
+  assert.deepEqual([JSON.parse(await lihat(pelawat)).bil_nota, JSON.parse(await lihat(pelawat)).nota], [1, []]);
+});
+
+test('nota Drive pada kuliah draf: 404; nota Drive menunggu kelulusan guru: tersembunyi sehingga lulus, tolak tanpa menyentuh R2', async () => {
+  const { repo, env, s } = await sedia();
+  const A = minta(repo, env, await sesi(repo, 'ustaz@gmail.com'));
+  const ahli = minta(repo, env, await sesi(repo, 'pelajar@gmail.com'));
+  const nDraf = await (await drive(A, s.draf.id, { nama: 'D', pautan: PAUTAN_D })).json();
+  assert.equal((await ahli('GET', `/api/nota/${nDraf.id}`)).status, 404);
+  // nota menunggu (cipta terus seperti tindakan guru) tidak boleh diakses pelajar
+  const m = await repo.ciptaNota(s.biasa.id, { nama: 'Tunggu', kunci: `drive/${s.biasa.id}/${ID_D}`, saiz: 0, sumber: 'drive', drive_id: ID_D, status: 'menunggu' }, 't');
+  assert.equal((await ahli('GET', `/api/nota/${m.id}`)).status, 404);
+  const q = await (await A('GET', '/api/admin/kelulusan')).json();
+  assert.deepEqual(q.nota.map((x) => [x.nama, x.sumber]), [['Tunggu', 'drive']]);
+  assert.equal((await A('GET', `/api/admin/nota/${m.id}`)).status, 302); // admin menyemak sebelum keputusan
+  let padamR2 = 0; const R2 = { ...env.NOTA, delete: async () => { padamR2++; } };
+  const A2 = minta(repo, { ...env, NOTA: R2 }, await sesi(repo, 'ustaz@gmail.com'));
+  assert.equal((await A2('POST', `/api/admin/kelulusan/nota/${m.id}/tolak`, { badan: JSON.stringify({ catatan: 'Pautan salah' }), header: { 'content-type': 'application/json' } })).status, 200);
+  assert.equal(padamR2, 0);
+});
+
+test('memadam subject dengan nota Drive tidak menyentuh R2 tetapi memadam fail R2 bagi nota biasa', async () => {
+  const { repo, env, s } = await sedia();
+  const A = minta(repo, env, await sesi(repo, 'ustaz@gmail.com'));
+  await muat(A, s.biasa.id); await drive(A, s.biasa.id, { nama: 'D', pautan: PAUTAN_D });
+  assert.equal(env.NOTA._objek.size, 1);
+  assert.equal((await A('DELETE', `/api/admin/subject/${s.biasa.id}`)).status, 200);
+  assert.equal(env.NOTA._objek.size, 0);
 });

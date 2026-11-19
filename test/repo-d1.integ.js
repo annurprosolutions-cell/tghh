@@ -148,7 +148,7 @@ test('nota: cipta, senarai tanpa kunci, kunci unik, kunci asing, dipadam bersama
   const s1 = await repo.ciptaSubject(c.id, { tajuk: 'n1', video_id: 'nnnnnnnnnnn', status: 'terbit' }, 't');
   const n1 = await repo.ciptaNota(s1.id, { nama: 'a.pdf', kunci: 'nota/x/1.pdf', saiz: 10 }, 't1');
   await repo.ciptaNota(s1.id, { nama: 'b.pdf', kunci: 'nota/x/2.pdf', saiz: 20 }, 't2');
-  assert.deepEqual(await repo.senaraiNota(s1.id), [{ id: n1.id, nama: 'a.pdf', saiz: 10, status: 'terbit' }, { id: n1.id + 1, nama: 'b.pdf', saiz: 20, status: 'terbit' }]);
+  assert.deepEqual(await repo.senaraiNota(s1.id), [{ id: n1.id, nama: 'a.pdf', saiz: 10, status: 'terbit', sumber: 'r2' }, { id: n1.id + 1, nama: 'b.pdf', saiz: 20, status: 'terbit', sumber: 'r2' }]);
   assert.deepEqual((await repo.kunciNota(s1.id)).sort(), ['nota/x/1.pdf', 'nota/x/2.pdf']);
   assert.equal((await repo.notaDariId(n1.id)).kunci, 'nota/x/1.pdf');
   assert.equal(await repo.notaDariId(null), null);
@@ -158,6 +158,23 @@ test('nota: cipta, senarai tanpa kunci, kunci unik, kunci asing, dipadam bersama
   assert.equal((await repo.senaraiNota(s1.id)).length, 1);
   await repo.padamSubject(s1.id); // nota dipadam dalam batch yang sama, tidak dihalang kunci asing
   assert.deepEqual(await repo.senaraiNota(s1.id), []);
+});
+
+test('nota Drive (v4): sumber, kunci jana unik, pendua, kunciNota hanya R2, padam bersama subject', async () => {
+  const c = await repo.ciptaCourse({ tajuk: 'ND', slug: 'n-drive', status: 'terbit' }, 't');
+  const s = await repo.ciptaSubject(c.id, { tajuk: 'nd', video_id: 'ddddddddddd', status: 'terbit' }, 't');
+  const ID = '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO';
+  const r2 = await repo.ciptaNota(s.id, { nama: 'r2.pdf', kunci: 'nota/d/1.pdf', saiz: 5 }, 't');
+  const d = await repo.ciptaNota(s.id, { nama: 'Slaid', kunci: `drive/${s.id}/${ID}`, saiz: 0, sumber: 'drive', drive_id: ID }, 't');
+  assert.equal((await repo.notaDariId(d.id)).drive_id, ID);
+  assert.deepEqual((await repo.senaraiNota(s.id)).map((x) => [x.nama, x.sumber]), [['r2.pdf', 'r2'], ['Slaid', 'drive']]);
+  assert.deepEqual(await repo.kunciNota(s.id), ['nota/d/1.pdf']);
+  assert.equal(await repo.adaNotaDrive(s.id, ID), true);
+  assert.equal(await repo.adaNotaDrive(s.id, 'X'.repeat(25)), false);
+  await assert.rejects(repo.ciptaNota(s.id, { nama: 'dua', kunci: `drive/${s.id}/${ID}`, saiz: 0, sumber: 'drive', drive_id: ID }, 't')); // kunci unik menghalang pendua
+  assert.ok(r2.id);
+  await repo.padamSubject(s.id);
+  assert.deepEqual(await repo.senaraiNota(s.id), []);
 });
 
 test('guru dan kelulusan: guru, course milik guru, subject menunggu, semakan unik, khatam, nota menunggu, padam berantai', async () => {
@@ -392,7 +409,6 @@ test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai,
     _setSemula();
     await pastikanSkema(d);
     assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
-    assert.equal(LANGKAH.length, 3);
     const r = repoD1(d);
     const c = await r.courseDariSlug('siri-lama');
     assert.deepEqual([c.tajuk, c.status, c.kategori_id], ['Siri Lama', 'terbit', null]);
@@ -407,7 +423,7 @@ test('naik taraf v1 ke v2: data lama kekal, lajur baharu NULL, kategori disemai,
     await Promise.all([(_setSemula(), pastikanSkema(d)), pastikanSkema(d)]);
     assert.equal((await r.senaraiKategori()).length, 5);
     assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM course').first()).c, 1);
-    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '3');
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
   } finally { await p2.dispose(); }
 });
 
@@ -507,7 +523,35 @@ test('naik taraf v2 ke v3: data lama kekal, video lama jadi youtube, lajur bahar
     const g = await r.guruDariEmel('g@v2.com');
     assert.deepEqual([g.nama, g.kelayakan, g.gambar], ['Guru V2', 'Sarjana', null]);
     for (let i = 0; i < 3; i++) { _setSemula(); await pastikanSkema(d); }
-    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, '3');
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
     assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM subject').first()).c, 1);
   } finally { await p3.dispose(); }
+});
+
+// ---------- Nota Drive: skema versi 4 ----------
+
+test('naik taraf v3 ke v4: nota R2 lama kekal sebagai sumber r2, drive_id NULL, nota Drive boleh ditambah, berulang selamat', async () => {
+  const p4 = await getPlatformProxy({ configPath: 'wrangler.uji.toml', persist: false });
+  try {
+    const d = p4.env.DB;
+    await d.batch([...LANGKAH.slice(0, 3).flatMap((l) => l.map((s) => d.prepare(s))), d.prepare(`INSERT INTO tetapan (kunci, nilai) VALUES ('skema_versi', '3')`)]);
+    await d.batch([
+      d.prepare(`INSERT INTO course (tajuk, slug, status, urutan, golongan, dicipta_pada, dikemas_kini_pada) VALUES ('Siri V3', 'siri-v3', 'terbit', 1, 'awam', 't', 't')`),
+      d.prepare(`INSERT INTO subject (course_id, tajuk, urutan, pratonton, status, video_sumber, video_id, dicipta_pada, dikemas_kini_pada) VALUES (1, 'K V3', 1, 1, 'terbit', 'youtube', 'aaaaaaaaaaa', 't', 't')`),
+      d.prepare(`INSERT INTO nota (subject_id, nama, kunci, saiz, dicipta_pada, status) VALUES (1, 'lama.pdf', 'nota/1/lama.pdf', 99, 't', 'terbit')`),
+    ]);
+    _setSemula();
+    await pastikanSkema(d);
+    const r = repoD1(d);
+    assert.equal((await d.prepare(`SELECT nilai FROM tetapan WHERE kunci = 'skema_versi'`).first()).nilai, String(LANGKAH.length));
+    const lama = (await r.senaraiNota(1))[0];
+    assert.deepEqual([lama.nama, lama.saiz, lama.sumber], ['lama.pdf', 99, 'r2']);
+    assert.equal((await r.notaDariId(lama.id)).drive_id, null);
+    assert.deepEqual(await r.kunciNota(1), ['nota/1/lama.pdf']);
+    const ID = '1FEln2yyKXbFFydEghgIyUoW9ygWaRwxO';
+    await r.ciptaNota(1, { nama: 'Drive', kunci: `drive/1/${ID}`, saiz: 0, sumber: 'drive', drive_id: ID }, 't');
+    assert.deepEqual((await r.senaraiNota(1)).map((x) => x.sumber), ['r2', 'drive']);
+    for (let i = 0; i < 3; i++) { _setSemula(); await pastikanSkema(d); }
+    assert.equal((await d.prepare('SELECT COUNT(*) AS c FROM nota').first()).c, 2);
+  } finally { await p4.dispose(); }
 });
